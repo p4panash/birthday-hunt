@@ -1,0 +1,51 @@
+:root {
+  /* ---------- Confetti Dusk palette ---------- */
+  --bg: #1F1430;
+  --surface: #2B1C42;
+  --surface-2: #3A2854;
+  --coral: #FF6B5B;
+  --coral-soft: #FF9A8E;
+  --cream: #FFD89C;
+  --text: #F5EBD9;
+  --muted: #8B7AA0;
+  --warmer: #FFB347;
+  --colder: #7CA9FF;
+  --shadow-glow: 0 0 24px rgba(255, 107, 91, 0.4);
+
+  /* ---------- Type ---------- */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: 'Inter', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-hand: 'Caveat', cursive;
+
+  /* tabular numbers for the countdown so digits don't dance */
+  --tnum: "tnum" 1, "lnum" 1;
+
+  /* ---------- Spacing ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* ---------- Radius ---------- */
+  --rad-sm: 6px;
+  --rad-md: 12px;
+  --rad-lg: 20px;
+  --rad-pill: 999px;
+
+  /* ---------- Easings (Michael Reeves vibes) ---------- */
+  --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-elastic: cubic-bezier(.68, -.55, .27, 1.55);
+  --ease-out-soft: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-derpy: cubic-bezier(.8, 0, .9, .5);
+
+  /* ---------- Z-index scale ---------- */
+  --z-banner: 50;
+  --z-sheet: 80;
+  --z-toast: 90;
+  --z-test: 100;
+}
