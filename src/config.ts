@@ -90,6 +90,10 @@ export type HuntConfig = {
 
   finale: {
     headline: string;
+    /** Bridge line between the headline and the locker hint. */
+    subheadline: string;
+    /** Label above the locker hint card. */
+    lockerHintLabel: string;
     /** Encoded into the displayed QR. Replace before launch. */
     qrPayload: string;
     /** Caption under the QR. */
@@ -97,6 +101,18 @@ export type HuntConfig = {
     qrBrightnessTip: string;
     saveQrLabel: string;
     openLockerMapLabel: string;
+  };
+
+  /**
+   * Where the EasyBox actually is. NOT a checkpoint — the friend goes here
+   * after the hunt completes, scans the assembled QR there.
+   */
+  easyboxLocation: {
+    /** Short name shown prominently on the finale, e.g. "Easybox @ Mega Image …" */
+    name: string;
+    /** Short hint / address description. */
+    hint: string;
+    mapsUrl: string;
   };
 
   errors: {
@@ -208,12 +224,21 @@ export const config: HuntConfig = {
 
   finale: {
     headline: 'YOU ABSOLUTE LEGEND.',
+    subheadline: 'one more thing — you\'re not at the locker yet.',
+    lockerHintLabel: 'go here:',
     // Placeholder — drop the real EasyBox QR PNG into public/qr.png too.
     qrPayload: 'https://easybox.sameday.ro/locker/REPLACE_ME',
-    instruction: 'show this at the locker. don\'t shake it.',
+    instruction: 'scan the QR when you get there. don\'t shake the package.',
     qrBrightnessTip: 'tip: max your brightness so the scanner sees it.',
     saveQrLabel: 'save QR to photos',
-    openLockerMapLabel: 'open easybox map',
+    openLockerMapLabel: 'open in maps',
+  },
+
+  easyboxLocation: {
+    // Placeholder — replace with the real EasyBox name + a directional hint + maps URL.
+    name: 'Easybox @ [LOCATION_TBD]',
+    hint: 'somewhere central. swap this for the real address before you send the link.',
+    mapsUrl: 'https://www.google.com/maps/?q=44.4268,26.1025',
   },
 
   errors: {

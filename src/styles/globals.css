@@ -406,6 +406,57 @@ p {
   justify-content: center;
 }
 
+.finale__top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.finale__subheadline {
+  color: var(--cream);
+  font-size: 16px;
+  font-style: italic;
+  text-wrap: balance;
+  opacity: 0.85;
+}
+
+/* Locker hint card — the "go here" prompt that sits above the QR. */
+.locker-card {
+  background: var(--surface);
+  border: 2px solid var(--coral);
+  border-radius: var(--rad-md);
+  padding: var(--sp-4) var(--sp-4) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  text-align: center;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  margin: 0 auto;
+  width: 100%;
+  max-width: 420px;
+}
+
+.locker-card__name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cream);
+  text-wrap: balance;
+}
+
+.locker-card__hint {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: balance;
+  opacity: 0.9;
+}
+
+.locker-card .btn-ghost {
+  align-self: center;
+  margin-top: var(--sp-1);
+}
+
 .qr-card img {
   width: 100%;
   height: 100%;

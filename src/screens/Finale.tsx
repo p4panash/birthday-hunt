@@ -11,19 +11,22 @@ type Props = { dispatch: React.Dispatch<HuntAction> };
 const QR_SRC = `${import.meta.env.BASE_URL}qr.png`;
 
 /**
- * Finale screen. Per master plan §2.4 / §7 of UX doc: the assembled QR
- * appears via a crash-zoom, the mascot pops in celebrating, big confetti.
+ * Finale screen.
  *
- * We trigger:
- *   • The finale sound (Phase 7 plumbs the actual <audio>; here it's a no-op
- *     hook into the bigBurst call so the rhythm is right).
- *   • bigBurst() once on mount.
+ * The 3 hunt checkpoints unlock progressive QR slices but do NOT lead to the
+ * actual EasyBox — the locker is its own destination, revealed here. Layout:
+ *
+ *   1. Headline ("YOU ABSOLUTE LEGEND.") — pops in
+ *   2. Locker hint card — name + hint + "open in maps" link
+ *   3. Assembled QR card — crash-zooms in
+ *   4. Instructions: "scan this when you get there"
+ *   5. Celebrating mascot + finale sound + big confetti
  */
 export default function Finale({ dispatch }: Props) {
-  const { finale } = config;
+  const { finale, easyboxLocation } = config;
 
   useEffect(() => {
-    // Sync with the QR scale-in animation peak (~1.5s after mount).
+    // Sync sound + confetti with the QR scale-in peak (~1.5s after mount).
     const tSound = setTimeout(() => playFinale(), 1400);
     const tBurst = setTimeout(() => bigBurst(), 1500);
     return () => {
@@ -34,27 +37,58 @@ export default function Finale({ dispatch }: Props) {
 
   return (
     <section className="screen screen--finale">
-      <motion.h1
-        className="finale__headline"
-        initial={{ scale: 0.4, opacity: 0, rotate: -6 }}
-        animate={{ scale: 1, opacity: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 420, damping: 16, delay: 0.1 }}
+      <motion.div
+        className="finale__top"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
       >
-        {finale.headline}
-      </motion.h1>
+        <motion.h1
+          className="finale__headline"
+          initial={{ scale: 0.4, opacity: 0, rotate: -6 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 16, delay: 0.1 }}
+        >
+          {finale.headline}
+        </motion.h1>
+        <p className="finale__subheadline">{finale.subheadline}</p>
+      </motion.div>
+
+      <motion.div
+        className="locker-card"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.55, ease: [0.34, 1.56, 0.64, 1] }}
+      >
+        <p className="eyebrow">{finale.lockerHintLabel}</p>
+        <h2 className="locker-card__name">{easyboxLocation.name}</h2>
+        <p className="locker-card__hint">{easyboxLocation.hint}</p>
+        <a
+          className="btn-ghost"
+          href={easyboxLocation.mapsUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          {finale.openLockerMapLabel}
+        </a>
+      </motion.div>
 
       <motion.div
         className="qr-card"
         initial={{ scale: 0.15, rotate: -25, opacity: 0 }}
-        animate={{ scale: [0.15, 1.15, 0.95, 1.02, 1], rotate: [-25, 8, -3, 1, 0], opacity: 1 }}
-        transition={{ duration: 1.2, ease: [0.34, 1.6, 0.64, 1], delay: 0.25 }}
+        animate={{
+          scale: [0.15, 1.15, 0.95, 1.02, 1],
+          rotate: [-25, 8, -3, 1, 0],
+          opacity: 1,
+        }}
+        transition={{ duration: 1.2, ease: [0.34, 1.6, 0.64, 1], delay: 0.9 }}
       >
         <img src={QR_SRC} alt="EasyBox QR" draggable={false} />
         <motion.div
           className="qr-card__scanline"
           initial={{ y: '-100%' }}
           animate={{ y: '100%' }}
-          transition={{ duration: 0.8, delay: 1.6, ease: 'linear' }}
+          transition={{ duration: 0.8, delay: 2.2, ease: 'linear' }}
           aria-hidden
         />
       </motion.div>
@@ -70,12 +104,12 @@ export default function Finale({ dispatch }: Props) {
         transition={{
           duration: 0.9,
           ease: [0.34, 1.8, 0.64, 1],
-          delay: 0.9,
-          y: { duration: 0.5, repeat: Infinity, repeatType: 'mirror', delay: 1.6 },
+          delay: 1.5,
+          y: { duration: 0.5, repeat: Infinity, repeatType: 'mirror', delay: 2.2 },
         }}
         aria-hidden
       >
-        <Mascot expression="celebrating" size={120} />
+        <Mascot expression="celebrating" size={110} />
       </motion.div>
 
       <p className="finale__instruction">{finale.instruction}</p>

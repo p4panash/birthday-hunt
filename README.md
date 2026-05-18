@@ -33,8 +33,10 @@ All content lives in `src/config.ts`:
 
 - `friendName` — recipient
 - `deadlineISO` — when the EasyBox auto-returns the package (countdown target)
-- `checkpoints[]` — the three locations (`lat`, `lng`, `radiusMeters`, hint, code)
-- `finale` — the QR payload / instruction copy
+- `checkpoints[]` — the three hunt locations (`lat`, `lng`, `radiusMeters`, `teaser`, `realHint`, `code`, `successCopy`). These are intermediate stops, **not** the locker itself.
+- `easyboxLocation` — where the actual EasyBox is. Revealed on the finale screen alongside the assembled QR, so the friend goes there to scan.
+- `finale` — headline / subheadline / locker-hint label / QR instructions
+- `intro`, `gpsPreface`, `warmthStatuses`, `stuckSheet`, `reveal`, `errors` — all UI copy
 
 The QR image lives at `public/qr.png` — replace with the real EasyBox QR before launch.
 
@@ -57,7 +59,8 @@ Open `https://…/birthday-hunt/?test=1` to enable a corner badge + debug drawer
 
 Before launch:
 
-- [ ] Replace the three `checkpoints[]` coords + `code`s in `src/config.ts` with real Bucharest spots
+- [ ] Replace the three `checkpoints[]` coords + `code`s in `src/config.ts` with real Bucharest spots (these are decoys/clues, NOT the locker)
+- [ ] Set `easyboxLocation` (name, hint, mapsUrl) — this is where the actual locker is
 - [ ] Save the codes somewhere on your phone so you can text them if asked
 - [ ] Set `deadlineISO` to ~48h after the EasyBox drop-off
 - [ ] Replace `public/qr.png` with the actual EasyBox QR
