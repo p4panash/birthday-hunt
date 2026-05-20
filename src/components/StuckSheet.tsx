@@ -13,8 +13,9 @@ type Props = {
 
 /**
  * Slide-up sheet revealed when the friend taps "stuck?".
- * Contains both the explicit hint (with maps deeplink) and the code-input
- * fallback. Wrong codes shake the input and flash the mascot's X_X eyes.
+ * Contains an additional landmark clue (more explicit than the teaser, but not
+ * the answer) and the code-input fallback. Wrong codes shake the input and
+ * flash the mascot's X_X eyes.
  */
 export default function StuckSheet({ open, n, onClose, onCodeAccepted }: Props) {
   const cp = config.checkpoints[n];
@@ -76,15 +77,6 @@ export default function StuckSheet({ open, n, onClose, onCodeAccepted }: Props) 
             <p className="eyebrow">{config.stuckSheet.title}</p>
             <h2 className="sheet__title">{config.stuckSheet.realHintIntro}</h2>
             <p className="sheet__hint">{cp.realHint}</p>
-
-            <a
-              className="btn-ghost"
-              href={cp.mapsUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              {config.stuckSheet.openInMapsCta}
-            </a>
 
             <div className="sheet__divider" />
 

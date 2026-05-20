@@ -14,10 +14,8 @@ export type Checkpoint = {
   name: string;
   /** Cryptic, always-visible teaser shown on the location screen. */
   teaser: string;
-  /** Explicit hint revealed inside the stuck sheet. */
+  /** Additional landmark clue revealed inside the stuck sheet — more explicit than the teaser, but a nudge, not the answer. */
   realHint: string;
-  /** geo: URI (mobile-friendly) or maps URL. */
-  mapsUrl: string;
   lat: number;
   lng: number;
   radiusMeters: number;
@@ -72,7 +70,6 @@ export type HuntConfig = {
   stuckSheet: {
     title: string;
     realHintIntro: string;
-    openInMapsCta: string;
     codeLabel: string;
     codePlaceholder: string;
     unlockCta: string;
@@ -161,8 +158,7 @@ export const config: HuntConfig = {
       name: 'Piața Universității',
       teaser: 'where the students pretend to study and the pigeons run the show.',
       realHint:
-        'piața universității, near the statue of mihai viteazul. that\'s it. that\'s the hint.',
-      mapsUrl: 'https://www.google.com/maps/?q=44.4353,26.1015',
+        'find the bronze king on the horse, sword out. stand where the students gather and the pigeons judge you. it\'s right there.',
       lat: 44.4353,
       lng: 26.1015,
       radiusMeters: 50,
@@ -175,8 +171,7 @@ export const config: HuntConfig = {
       name: 'Parcul Cișmigiu',
       teaser: 'the bench where you made That Phone Call in 2022.',
       realHint:
-        'main entrance of cișmigiu, off bulevardul regina elisabeta. the bench by the lake.',
-      mapsUrl: 'https://www.google.com/maps/?q=44.4360,26.0925',
+        'head for the big park with the lake and the rowboats. our bench faces the water, near where the swans act like they own the place.',
       lat: 44.436,
       lng: 26.0925,
       radiusMeters: 50,
@@ -188,8 +183,8 @@ export const config: HuntConfig = {
       id: 3,
       name: 'Ateneul Român',
       teaser: 'the round building with columns that looks like a greek wedding.',
-      realHint: 'in front of the main entrance of the romanian athenaeum.',
-      mapsUrl: 'https://www.google.com/maps/?q=44.4414,26.0973',
+      realHint:
+        'look for the domed concert hall with the seated poet statue out front and the fancy old hotel across the way. stand by the steps.',
       lat: 44.4414,
       lng: 26.0973,
       radiusMeters: 50,
@@ -208,8 +203,7 @@ export const config: HuntConfig = {
 
   stuckSheet: {
     title: 'stuck?',
-    realHintIntro: 'fine. here it is.',
-    openInMapsCta: 'open in maps',
+    realHintIntro: 'ugh, fine. one more clue:',
     codeLabel: 'got a code? type it.',
     codePlaceholder: '----',
     unlockCta: 'unlock',
