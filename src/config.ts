@@ -48,7 +48,6 @@ export type HuntConfig = {
     headline: string;
     body: string;
     allowCta: string;
-    denyCta: string;
   };
 
   /** ISO 8601 timestamp — when the EasyBox returns the package. Drives the countdown. */
@@ -128,27 +127,26 @@ export type HuntConfig = {
 };
 
 export const config: HuntConfig = {
-  friendName: "birthday boy",
+  friendName: "Mihali",
 
   intro: {
-    eyebrow: "happy birthday, you menace",
-    headline: "hey [FRIEND_NAME]. i hid your gift. good luck.",
-    body: "3 stops. 3 clues. 1 locker. walk. don't Uber. i'll know.",
+    eyebrow: "happy birthday!",
+    headline: "hey [FRIEND_NAME]. we hid your gift. good luck.",
+    body: "3 stops. 3 clues. 1 locker. hop on the bike or walk it — your call. just don't Uber. we'll know.",
     cta: "let's go →",
-    finePrint: "tap = i agree to walk around bucharest like a tourist",
+    finePrint: "",
   },
 
   gpsPreface: {
-    headline: "i need to know where you are.",
-    body: "otherwise this hunt is just me typing words at you. pinky promise: i'm not tracking you, your phone is. i just listen.",
+    headline: "we need to know where you are.",
+    body: "otherwise this hunt is just us typing words at you. pinky promise: we're not tracking you, your phone is. we just listen.",
     allowCta: "allow location",
-    denyCta: "i'll type codes instead",
   },
 
   // Placeholder: drop-off + 48h. Replace before launch.
   deadlineISO: "2026-05-20T18:00:00+03:00",
   countdown: {
-    eyebrow: "time until the locker spits it back:",
+    eyebrow: "tick tock. the locker repossesses your gift in:",
   },
 
   checkpoints: [
@@ -223,17 +221,16 @@ export const config: HuntConfig = {
     lockerHintLabel: "go here:",
     // Placeholder — drop the real EasyBox QR PNG into public/qr.png too.
     qrPayload: "https://easybox.sameday.ro/locker/REPLACE_ME",
-    instruction: "scan the QR when you get there. don't shake the package.",
+    instruction: "scan the QR when you get there. try to keep it together in front of strangers.",
     qrBrightnessTip: "tip: max your brightness so the scanner sees it.",
     saveQrLabel: "save QR to photos",
     openLockerMapLabel: "open in maps",
   },
 
   easyboxLocation: {
-    // Placeholder — replace with the real EasyBox name + a directional hint + maps URL.
-    name: "Easybox @ [LOCATION_TBD]",
-    hint: "somewhere central. swap this for the real address before you send the link.",
-    mapsUrl: "https://www.google.com/maps/?q=44.4268,26.1025",
+    name: "Easybox Domnița Florica",
+    hint: "strada domnița florica 13. told you to bring the bike. last push, go get it.",
+    mapsUrl: "https://maps.app.goo.gl/diwa77ADVXN1f8SE6",
   },
 
   errors: {

@@ -95,7 +95,7 @@ function Router({
     case 'gps-preface':
       return <GpsPreface dispatch={dispatch} />;
     case 'location':
-      return <LocationActive dispatch={dispatch} n={step.n} />;
+      return <LocationActive dispatch={dispatch} n={step.n} testMode={state.testMode} />;
     case 'reveal':
       return (
         <Reveal
@@ -107,6 +107,6 @@ function Router({
     case 'photo':
       return <PhotoInterstitial dispatch={dispatch} afterN={step.afterN} />;
     case 'finale':
-      return <Finale dispatch={dispatch} />;
+      return <Finale dispatch={dispatch} testMode={state.testMode} />;
   }
 }

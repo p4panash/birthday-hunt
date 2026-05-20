@@ -213,28 +213,20 @@ p {
   gap: var(--sp-3);
 }
 
-.path-dots {
-  display: flex;
-  justify-content: center;
-  gap: var(--sp-4);
-  padding: var(--sp-3) 0;
+/* Inline countdown on the intro (replaces the old path dots). Strips the
+   sticky-banner chrome so it sits in the normal flow. */
+.countdown--inline {
+  position: static;
+  z-index: auto;
+  padding: var(--sp-2) 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: auto;
 }
 
-.path-dots span {
-  display: block;
-  width: 12px;
-  height: 12px;
-  background: var(--coral);
-  border-radius: 50%;
-  animation: dotPulse 1.4s var(--ease-bounce) infinite;
-}
-
-.path-dots span:nth-child(2) { animation-delay: 0.18s; }
-.path-dots span:nth-child(3) { animation-delay: 0.36s; }
-
-@keyframes dotPulse {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50%      { transform: scale(1.3); opacity: 1; }
+.countdown--inline .countdown__digits {
+  font-size: 40px;
 }
 
 /* ---------- GPS preface ---------- */
@@ -281,10 +273,18 @@ p {
 }
 
 /* ---------- Reveal ---------- */
+/* Compact so the GOTCHA screen fits under the sticky countdown + scaffold
+   without scrolling. */
+.screen--reveal {
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-4);
+}
+
 .reveal__headline {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 52px;
+  font-size: 44px;
   color: var(--coral);
   letter-spacing: -0.02em;
 }
@@ -300,11 +300,11 @@ p {
 .reveal__stage {
   position: relative;
   width: 100%;
-  height: min(48vh, 360px);
+  height: min(28vh, 220px);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: var(--sp-3) 0;
+  margin: var(--sp-2) 0;
 }
 
 .reveal__mascot {
@@ -319,7 +319,7 @@ p {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(56vw, 220px);
+  width: min(46vw, 168px);
   aspect-ratio: 1 / 1;
   translate: -50% -50%;
   z-index: 2;
@@ -364,20 +364,31 @@ p {
 }
 
 /* ---------- Finale ---------- */
+/* Compact layout so the whole finale fits a phone viewport without scrolling. */
+.screen--finale {
+  justify-content: center;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-4);
+}
+
 .finale__headline {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 38px;
+  font-size: 34px;
   color: var(--cream);
   text-wrap: balance;
 }
 
 .qr-card {
   position: relative;
+  appearance: none;
+  border: none;
+  cursor: pointer;
   background: var(--text);
-  padding: var(--sp-4);
+  padding: var(--sp-3);
   border-radius: var(--rad-md);
-  width: min(72vw, 320px);
+  width: min(44vw, 168px);
   aspect-ratio: 1 / 1;
   margin: 0 auto;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
@@ -385,6 +396,26 @@ p {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.qr-card:active { transform: scale(0.96); }
+
+/* "tap to enlarge" badge over the small preview QR (not meant to be scanned). */
+.qr-card__hint {
+  position: absolute;
+  bottom: var(--sp-2);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: rgba(255, 216, 156, 0.92);
+  padding: 3px 10px;
+  border-radius: var(--rad-pill);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .qr-card__scanline {
@@ -465,8 +496,49 @@ p {
 
 .finale__instruction {
   color: var(--cream);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 500;
+  text-wrap: balance;
+}
+
+/* Fullscreen QR lightbox — opened by tapping the compact finale QR. */
+.qr-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(10, 6, 18, 0.94);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  cursor: pointer;
+}
+
+.qr-lightbox__img {
+  width: min(86vw, 86vh, 460px);
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  background: #fff;
+  padding: var(--sp-4);
+  border-radius: var(--rad-md);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.qr-lightbox__tip {
+  color: var(--cream);
+  font-size: 14px;
+  text-align: center;
+  text-wrap: balance;
+  max-width: 30ch;
+}
+
+.qr-lightbox__hint {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
 }
 
 /* ---------- Portrait lock ---------- */

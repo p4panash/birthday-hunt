@@ -77,7 +77,7 @@ export default function Reveal({ dispatch, n, slice }: Props) {
         >
           <Mascot
             expression={phase === 'done' ? 'celebrating' : 'excited'}
-            size={140}
+            size={104}
           />
         </motion.div>
 

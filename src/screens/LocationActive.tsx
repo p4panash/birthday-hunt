@@ -9,9 +9,10 @@ import type { CheckpointIndex, HuntAction } from '../state/huntReducer';
 type Props = {
   dispatch: React.Dispatch<HuntAction>;
   n: CheckpointIndex;
+  testMode: boolean;
 };
 
-export default function LocationActive({ dispatch, n }: Props) {
+export default function LocationActive({ dispatch, n, testMode }: Props) {
   const cp = config.checkpoints[n];
   const { status, distanceMeters, accuracyMeters } = useGeoWatch({
     lat: cp.lat,
@@ -41,9 +42,11 @@ export default function LocationActive({ dispatch, n }: Props) {
         {config.stuckSheet.title}
       </button>
 
-      <button className="dev-skip" onClick={() => dispatch({ type: 'UNLOCK_CHECKPOINT', n })}>
-        (dev) simulate unlock →
-      </button>
+      {testMode && (
+        <button className="dev-skip" onClick={() => dispatch({ type: 'UNLOCK_CHECKPOINT', n })}>
+          (dev) simulate unlock →
+        </button>
+      )}
 
       <StuckSheet
         open={stuckOpen}

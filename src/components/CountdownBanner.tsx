@@ -3,17 +3,26 @@ import { config } from '../config';
 import { useCountdown } from '../lib/countdown';
 
 /**
- * Sticky countdown banner. Visible on every screen.
+ * Countdown timer. Two looks:
+ *   - default: sticky top banner overlaying the screen (chrome on most screens)
+ *   - inline:  in-flow block (used on the intro in place of the path dots)
  *
- * Styling carries the urgency — large coral mono digits on plum, drop shadow,
- * a slight idle wobble for the Michael Reeves vibe. No behavioral tiers.
+ * Styling carries the urgency — coral mono digits on plum, drop shadow, a
+ * slight idle wobble for the Michael Reeves vibe. No behavioral tiers.
  */
-export default function CountdownBanner({ deadlineISO }: { deadlineISO?: string } = {}) {
+export default function CountdownBanner({
+  deadlineISO,
+  inline = false,
+}: { deadlineISO?: string; inline?: boolean } = {}) {
   const target = deadlineISO ?? config.deadlineISO;
   const cd = useCountdown(target);
 
   return (
-    <div className="countdown" role="timer" aria-live="off">
+    <div
+      className={inline ? 'countdown countdown--inline' : 'countdown'}
+      role="timer"
+      aria-live="off"
+    >
       <p className="countdown__eyebrow">{config.countdown.eyebrow}</p>
       <motion.div
         className="countdown__digits tnum"

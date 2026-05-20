@@ -1,12 +1,12 @@
-import { useEffect } from 'react';
-import { motion } from 'motion/react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { config } from '../config';
 import { bigBurst } from '../lib/confettiBurst';
 import { playFinale } from '../lib/sounds';
 import Mascot from '../components/Mascot';
 import type { HuntAction } from '../state/huntReducer';
 
-type Props = { dispatch: React.Dispatch<HuntAction> };
+type Props = { dispatch: React.Dispatch<HuntAction>; testMode: boolean };
 
 const QR_SRC = `${import.meta.env.BASE_URL}qr.png`;
 
@@ -14,16 +14,19 @@ const QR_SRC = `${import.meta.env.BASE_URL}qr.png`;
  * Finale screen.
  *
  * The 3 hunt checkpoints unlock progressive QR slices but do NOT lead to the
- * actual EasyBox — the locker is its own destination, revealed here. Layout:
+ * actual EasyBox — the locker is its own destination, revealed here. Layout is
+ * tuned to fit a phone viewport without scrolling: the QR sits small and taps
+ * open to a fullscreen lightbox for scanning. Layout order:
  *
  *   1. Headline ("YOU ABSOLUTE LEGEND.") — pops in
  *   2. Locker hint card — name + hint + "open in maps" link
- *   3. Assembled QR card — crash-zooms in
+ *   3. Assembled QR card (compact) — crash-zooms in, tap to enlarge
  *   4. Instructions: "scan this when you get there"
  *   5. Celebrating mascot + finale sound + big confetti
  */
-export default function Finale({ dispatch }: Props) {
+export default function Finale({ dispatch, testMode }: Props) {
   const { finale, easyboxLocation } = config;
+  const [qrExpanded, setQrExpanded] = useState(false);
 
   useEffect(() => {
     // Sync sound + confetti with the QR scale-in peak (~1.5s after mount).
@@ -73,8 +76,11 @@ export default function Finale({ dispatch }: Props) {
         </a>
       </motion.div>
 
-      <motion.div
+      <motion.button
+        type="button"
         className="qr-card"
+        onClick={() => setQrExpanded(true)}
+        aria-label="enlarge QR code"
         initial={{ scale: 0.15, rotate: -25, opacity: 0 }}
         animate={{
           scale: [0.15, 1.15, 0.95, 1.02, 1],
@@ -91,7 +97,8 @@ export default function Finale({ dispatch }: Props) {
           transition={{ duration: 0.8, delay: 2.2, ease: 'linear' }}
           aria-hidden
         />
-      </motion.div>
+        <span className="qr-card__hint" aria-hidden>tap to enlarge</span>
+      </motion.button>
 
       <motion.div
         className="finale__mascot"
@@ -109,15 +116,45 @@ export default function Finale({ dispatch }: Props) {
         }}
         aria-hidden
       >
-        <Mascot expression="celebrating" size={110} />
+        <Mascot expression="celebrating" size={84} />
       </motion.div>
 
       <p className="finale__instruction">{finale.instruction}</p>
-      <p className="fine-print">{finale.qrBrightnessTip}</p>
 
-      <button className="dev-skip" onClick={() => dispatch({ type: 'RESET' })}>
-        (dev) reset
-      </button>
+      {testMode && (
+        <button className="dev-skip" onClick={() => dispatch({ type: 'RESET' })}>
+          (dev) reset
+        </button>
+      )}
+
+      <AnimatePresence>
+        {qrExpanded && (
+          <motion.div
+            className="qr-lightbox"
+            role="dialog"
+            aria-modal="true"
+            aria-label="EasyBox QR code"
+            onClick={() => setQrExpanded(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.img
+              className="qr-lightbox__img"
+              src={QR_SRC}
+              alt="EasyBox QR"
+              draggable={false}
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            />
+            <p className="qr-lightbox__tip">{finale.qrBrightnessTip}</p>
+            <span className="qr-lightbox__hint" aria-hidden>tap anywhere to close</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

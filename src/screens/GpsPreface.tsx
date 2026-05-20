@@ -14,9 +14,6 @@ export default function GpsPreface({ dispatch }: Props) {
         <button className="btn-primary" onClick={() => dispatch({ type: 'GRANT_GPS' })}>
           {gpsPreface.allowCta}
         </button>
-        <button className="btn-ghost" onClick={() => dispatch({ type: 'DENY_GPS' })}>
-          {gpsPreface.denyCta}
-        </button>
       </div>
     </section>
   );
