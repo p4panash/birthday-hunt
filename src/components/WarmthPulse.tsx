@@ -79,7 +79,7 @@ function statusText(status: GeoStatus, tier: WarmthTier): string {
 function BlobSvg({ tier }: { tier: WarmthTier }) {
   const eyeSize = eyeSizeForTier(tier);
   return (
-    <svg viewBox="0 0 160 160" width="160" height="160" aria-hidden>
+    <svg viewBox="0 0 160 160" width="140" height="140" aria-hidden>
       {/* body — wobbly oval, intentionally off-center */}
       <path
         d="M 80 18 C 122 14, 146 50, 144 88 C 142 124, 110 148, 76 144 C 36 140, 12 108, 18 70 C 22 38, 50 22, 80 18 Z"

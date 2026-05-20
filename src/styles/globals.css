@@ -242,6 +242,14 @@ p {
 }
 
 /* ---------- Location active ---------- */
+/* Tighter spacing so the teaser + warmth blob + "stuck?" all fit under the
+   sticky countdown + scaffold without scrolling. */
+.screen--location {
+  gap: var(--sp-4);
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-4);
+}
+
 .location__teaser {
   font-family: var(--font-display);
   font-style: italic;
@@ -256,8 +264,8 @@ p {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-5) 0;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
 }
 
 .warmth__blob {
@@ -850,19 +858,28 @@ p {
   50%      { opacity: 1; }
 }
 
+/* Dev-only sheet: keep it compact so it doesn't swallow the screen and there's
+   plenty of backdrop left to tap-close. */
 .sheet--test {
   text-align: left;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
+  max-height: 72vh;
+  padding-top: var(--sp-3);
+}
+
+.sheet--test .sheet__handle {
+  margin-bottom: var(--sp-1);
 }
 
 .sheet--test .sheet__title {
   text-align: center;
+  font-size: 18px;
 }
 
 .test-section {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-1);
   padding-bottom: var(--sp-2);
   border-bottom: 1px solid rgba(139, 122, 160, 0.18);
 }
@@ -878,18 +895,18 @@ p {
 .test-section__grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--sp-2);
+  gap: var(--sp-1);
 }
 
 .test-btn {
   background: var(--surface-2);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-1) var(--sp-2);
   border-radius: var(--rad-sm);
-  min-height: 40px;
+  min-height: 32px;
   text-align: center;
   transition: transform 150ms var(--ease-bounce), background 150ms ease;
 }
