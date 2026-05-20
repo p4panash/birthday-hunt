@@ -144,7 +144,7 @@ export const config: HuntConfig = {
   },
 
   // Placeholder: drop-off + 48h. Replace before launch.
-  deadlineISO: "2026-05-20T18:00:00+03:00",
+  deadlineISO: "2026-05-21T18:00:00+03:00",
   countdown: {
     eyebrow: "tick tock. the locker repossesses your gift in:",
   },
@@ -157,8 +157,10 @@ export const config: HuntConfig = {
         "somewhere in bucharest, a ufo landed in a park and nobody batted an eye.",
       realHint:
         "the park named after youth. the ferris wheel knows where to look.",
-      lat: 44.40901126215023,
-      lng: 26.106899327158118,
+      // lat: 44.40901126215023,
+      // lng: 26.106899327158118,
+      lat: 46.774415958947834,
+      lng: 23.58130432057823,
       radiusMeters: 25,
       code: "OZN",
       successCopy:
@@ -221,7 +223,8 @@ export const config: HuntConfig = {
     lockerHintLabel: "go here:",
     // Placeholder — drop the real EasyBox QR PNG into public/qr.png too.
     qrPayload: "https://easybox.sameday.ro/locker/REPLACE_ME",
-    instruction: "scan the QR when you get there. try to keep it together in front of strangers.",
+    instruction:
+      "scan the QR when you get there. try to keep it together in front of strangers.",
     qrBrightnessTip: "tip: max your brightness so the scanner sees it.",
     saveQrLabel: "save QR to photos",
     openLockerMapLabel: "open in maps",
