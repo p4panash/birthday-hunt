@@ -36,8 +36,7 @@ export type HuntAction =
   | { type: 'REVEAL_COMPLETE'; n: CheckpointIndex; hasPhotoAfter: boolean }
   | { type: 'PHOTO_DONE'; afterN: CheckpointIndex }
   | { type: 'RESET' }
-  | { type: 'JUMP_TO_STEP'; step: HuntStep }
-  | { type: 'SET_TEST_MODE'; testMode: boolean };
+  | { type: 'JUMP_TO_STEP'; step: HuntStep };
 
 export const STORAGE_KEY = 'bday-hunt-v1';
 
@@ -91,9 +90,6 @@ export function huntReducer(state: HuntState, action: HuntAction): HuntState {
 
     case 'JUMP_TO_STEP':
       return { ...state, step: action.step };
-
-    case 'SET_TEST_MODE':
-      return { ...state, testMode: action.testMode };
 
     case 'RESET':
       return { ...initialState, testMode: state.testMode };

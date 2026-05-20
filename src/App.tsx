@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useReducer } from 'react';
 import {
   STORAGE_KEY,
   huntReducer,
@@ -24,22 +24,15 @@ const QR_SRC = `${import.meta.env.BASE_URL}qr.png`;
 
 function init(seed: HuntState): HuntState {
   const stored = loadFromStorage<HuntState | null>(STORAGE_KEY, null);
-  return stored ?? seed;
+  // testMode is derived from the URL on every load, never from persisted state,
+  // so a previously-tested device falls back to a clean (no dev tools) view.
+  return { ...(stored ?? seed), testMode: detectTestMode() };
 }
 
 export default function App() {
   const [state, dispatch] = useReducer(huntReducer, initialState, init);
   useLocalStorageSync(STORAGE_KEY, state);
   const sliceUrls = useQrSlices(QR_SRC);
-
-  // Detect test mode once on mount; sync to reducer state.
-  useEffect(() => {
-    const t = detectTestMode();
-    if (t !== state.testMode) {
-      dispatch({ type: 'SET_TEST_MODE', testMode: t });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const showChrome = state.step.kind !== 'intro' && state.step.kind !== 'gps-preface';
   const currentN = currentCheckpoint(state);
