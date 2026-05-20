@@ -62,9 +62,9 @@ export type HuntConfig = {
   /** Status copy mapped to four distance buckets (see WarmthPulse in Phase 3). */
   warmthStatuses: {
     veryFar: string; // >500m
-    far: string;     // 200–500m
-    close: string;   // 50–200m
-    onTop: string;   // <50m
+    far: string; // 200–500m
+    close: string; // 50–200m
+    onTop: string; // <50m
   };
 
   stuckSheet: {
@@ -128,126 +128,127 @@ export type HuntConfig = {
 };
 
 export const config: HuntConfig = {
-  friendName: 'birthday boy',
+  friendName: "birthday boy",
 
   intro: {
-    eyebrow: 'happy birthday, you menace',
-    headline: 'hey [FRIEND_NAME]. i hid your gift. good luck.',
-    body: '3 stops. 3 clues. 1 locker. walk. don\'t Uber. i\'ll know.',
+    eyebrow: "happy birthday, you menace",
+    headline: "hey [FRIEND_NAME]. i hid your gift. good luck.",
+    body: "3 stops. 3 clues. 1 locker. walk. don't Uber. i'll know.",
     cta: "let's go →",
-    finePrint: 'tap = i agree to walk around bucharest like a tourist',
+    finePrint: "tap = i agree to walk around bucharest like a tourist",
   },
 
   gpsPreface: {
-    headline: 'i need to know where you are.',
-    body:
-      "otherwise this hunt is just me typing words at you. pinky promise: i'm not tracking you, your phone is. i just listen.",
-    allowCta: 'allow location',
+    headline: "i need to know where you are.",
+    body: "otherwise this hunt is just me typing words at you. pinky promise: i'm not tracking you, your phone is. i just listen.",
+    allowCta: "allow location",
     denyCta: "i'll type codes instead",
   },
 
   // Placeholder: drop-off + 48h. Replace before launch.
-  deadlineISO: '2026-05-20T18:00:00+03:00',
+  deadlineISO: "2026-05-20T18:00:00+03:00",
   countdown: {
-    eyebrow: 'time until the locker spits it back:',
+    eyebrow: "time until the locker spits it back:",
   },
 
   checkpoints: [
     {
       id: 1,
-      name: 'Piața Universității',
-      teaser: 'where the students pretend to study and the pigeons run the show.',
+      name: "OZN Tineretului",
+      teaser:
+        "somewhere in bucharest, a ufo landed in a park and nobody batted an eye.",
       realHint:
-        'find the bronze king on the horse, sword out. stand where the students gather and the pigeons judge you. it\'s right there.',
-      lat: 44.4353,
-      lng: 26.1015,
-      radiusMeters: 50,
-      code: 'MIHAI',
+        "the park named after youth. the ferris wheel knows where to look.",
+      lat: 44.40901126215023,
+      lng: 26.106899327158118,
+      radiusMeters: 25,
+      code: "OZN",
       successCopy:
-        'one down. two to go. next: a park where the ducks have more dignity than some politicians.',
+        "nice. the aliens approved. now find the place where someone's waiting with something for you.",
     },
     {
       id: 2,
-      name: 'Parcul Cișmigiu',
-      teaser: 'the bench where you made That Phone Call in 2022.',
+      name: "Parcul Cișmigiu",
+      teaser: "the bench where you made That Phone Call in 2022.",
       realHint:
-        'head for the big park with the lake and the rowboats. our bench faces the water, near where the swans act like they own the place.',
+        "head for the big park with the lake and the rowboats. our bench faces the water, near where the swans act like they own the place.",
       lat: 44.436,
       lng: 26.0925,
       radiusMeters: 50,
-      code: 'LEBADA',
+      code: "LEBADA",
       successCopy:
-        'two down. you\'re almost worthy of a present. last stop: something classy.',
+        "two down. you're almost worthy of a present. last stop: something classy.",
     },
     {
       id: 3,
-      name: 'Ateneul Român',
-      teaser: 'the round building with columns that looks like a greek wedding.',
+      name: "Ateneul Român",
+      teaser:
+        "the round building with columns that looks like a greek wedding.",
       realHint:
-        'look for the domed concert hall with the seated poet statue out front and the fancy old hotel across the way. stand by the steps.',
+        "look for the domed concert hall with the seated poet statue out front and the fancy old hotel across the way. stand by the steps.",
       lat: 44.4414,
       lng: 26.0973,
       radiusMeters: 50,
-      code: 'ENESCU',
+      code: "ENESCU",
       successCopy:
-        'THREE FOR THREE. now scan the QR. find the easybox. open it. don\'t cry in public.',
+        "THREE FOR THREE. now scan the QR. find the easybox. open it. don't cry in public.",
     },
   ],
 
   warmthStatuses: {
-    veryFar: 'somewhere out there.',
-    far: 'getting warmer...',
-    close: 'much warmer.',
-    onTop: 'you\'re basically on top of it. look around.',
+    veryFar: "somewhere out there.",
+    far: "getting warmer...",
+    close: "much warmer.",
+    onTop: "you're basically on top of it. look around.",
   },
 
   stuckSheet: {
-    title: 'stuck?',
-    realHintIntro: 'ugh, fine. one more clue:',
-    codeLabel: 'got a code? type it.',
-    codePlaceholder: '----',
-    unlockCta: 'unlock',
-    closeCta: 'close and pretend i didn\'t',
+    title: "stuck?",
+    realHintIntro: "ugh, fine. one more clue:",
+    codeLabel: "got a code? type it.",
+    codePlaceholder: "----",
+    unlockCta: "unlock",
+    closeCta: "close and pretend i didn't",
   },
 
   reveal: {
-    headline: 'GOTCHA.',
-    nextCta: 'on to the next stop →',
-    finaleCta: 'open the final screen →',
+    headline: "GOTCHA.",
+    nextCta: "on to the next stop →",
+    finaleCta: "open the final screen →",
   },
 
   finale: {
-    headline: 'YOU ABSOLUTE LEGEND.',
-    subheadline: 'one more thing — you\'re not at the locker yet.',
-    lockerHintLabel: 'go here:',
+    headline: "YOU ABSOLUTE LEGEND.",
+    subheadline: "one more thing — you're not at the locker yet.",
+    lockerHintLabel: "go here:",
     // Placeholder — drop the real EasyBox QR PNG into public/qr.png too.
-    qrPayload: 'https://easybox.sameday.ro/locker/REPLACE_ME',
-    instruction: 'scan the QR when you get there. don\'t shake the package.',
-    qrBrightnessTip: 'tip: max your brightness so the scanner sees it.',
-    saveQrLabel: 'save QR to photos',
-    openLockerMapLabel: 'open in maps',
+    qrPayload: "https://easybox.sameday.ro/locker/REPLACE_ME",
+    instruction: "scan the QR when you get there. don't shake the package.",
+    qrBrightnessTip: "tip: max your brightness so the scanner sees it.",
+    saveQrLabel: "save QR to photos",
+    openLockerMapLabel: "open in maps",
   },
 
   easyboxLocation: {
     // Placeholder — replace with the real EasyBox name + a directional hint + maps URL.
-    name: 'Easybox @ [LOCATION_TBD]',
-    hint: 'somewhere central. swap this for the real address before you send the link.',
-    mapsUrl: 'https://www.google.com/maps/?q=44.4268,26.1025',
+    name: "Easybox @ [LOCATION_TBD]",
+    hint: "somewhere central. swap this for the real address before you send the link.",
+    mapsUrl: "https://www.google.com/maps/?q=44.4268,26.1025",
   },
 
   errors: {
-    wrongCode: 'nope. that\'s not it. count the letters again, champ.',
+    wrongCode: "nope. that's not it. count the letters again, champ.",
     gpsDenied:
       "your phone won't share your location. cool. cool cool cool. type the codes instead.",
-    gpsFlaky: 'your phone\'s a bit lost. waving at satellites...',
-    offline: 'you\'re offline. that\'s fine, we cached everything. keep going.',
+    gpsFlaky: "your phone's a bit lost. waving at satellites...",
+    offline: "you're offline. that's fine, we cached everything. keep going.",
   },
 
   photos: [],
 
   sound: {
-    unlockSrc: 'sound/unlock.ogg',
-    finaleSrc: 'sound/finale.ogg',
+    unlockSrc: "sound/unlock.ogg",
+    finaleSrc: "sound/finale.ogg",
   },
 };
 
