@@ -31,7 +31,6 @@ export type HuntState = {
 export type HuntAction =
   | { type: 'START_HUNT' }
   | { type: 'GRANT_GPS' }
-  | { type: 'DENY_GPS' }
   | { type: 'UNLOCK_CHECKPOINT'; n: CheckpointIndex }
   | { type: 'REVEAL_COMPLETE'; n: CheckpointIndex; hasPhotoAfter: boolean }
   | { type: 'PHOTO_DONE'; afterN: CheckpointIndex }
@@ -57,10 +56,6 @@ export function huntReducer(state: HuntState, action: HuntAction): HuntState {
       };
 
     case 'GRANT_GPS':
-    case 'DENY_GPS':
-      // Both routes proceed to the first checkpoint; the difference (whether to
-      // pre-expand the stuck sheet's code field) is handled by the screen itself
-      // reading the latest geolocation permission state.
       return { ...state, step: { kind: 'location', n: 0 } };
 
     case 'UNLOCK_CHECKPOINT': {
