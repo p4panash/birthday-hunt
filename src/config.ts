@@ -2,11 +2,11 @@
  * The ONE file the user edits before launch.
  *
  * Everything that varies between hunts (recipient name, locations, codes, copy,
- * deadlines, QR payload semantics) lives here. Replace placeholder values in
- * Phase 9; the rest of the app reads from this object.
+ * deadlines) lives here. Replace placeholder values before launch; the rest of
+ * the app reads from this object.
  *
- * Copy supports [VAR] template substitution — see `src/lib/tpl.ts`. Available
- * vars: FRIEND_NAME, LOCATION_NAME, LANDMARK_DETAIL, AGE.
+ * Copy supports [VAR] template substitution — see `src/lib/tpl.ts`. The only
+ * substituted var is FRIEND_NAME.
  */
 
 export type Checkpoint = {
@@ -90,12 +90,9 @@ export type HuntConfig = {
     subheadline: string;
     /** Label above the locker hint card. */
     lockerHintLabel: string;
-    /** Encoded into the displayed QR. Replace before launch. */
-    qrPayload: string;
     /** Caption under the QR. */
     instruction: string;
     qrBrightnessTip: string;
-    saveQrLabel: string;
     openLockerMapLabel: string;
   };
 
@@ -115,7 +112,6 @@ export type HuntConfig = {
     wrongCode: string;
     gpsDenied: string;
     gpsFlaky: string;
-    offline: string;
   };
 
   photos: PhotoConfig[];
@@ -144,7 +140,7 @@ export const config: HuntConfig = {
   },
 
   // Placeholder: drop-off + 48h. Replace before launch.
-  deadlineISO: "2026-05-21T18:00:00+03:00",
+  deadlineISO: "2026-05-26T18:00:00+03:00",
   countdown: {
     eyebrow: "tick tock. the locker repossesses your gift in:",
   },
@@ -156,40 +152,36 @@ export const config: HuntConfig = {
       teaser:
         "somewhere in bucharest, a ufo landed in a park and nobody batted an eye.",
       realHint:
-        "the park named after youth. the ferris wheel knows where to look.",
-      // lat: 44.40901126215023,
-      // lng: 26.106899327158118,
-      lat: 46.774415958947834,
-      lng: 23.58130432057823,
+        "go where bucharest keeps its youth. something there never quite fit in.",
+      lat: 44.409062219291364,
+      lng: 26.10696297620568,
       radiusMeters: 25,
       code: "OZN",
-      successCopy:
-        "nice. the aliens approved. now find the place where someone's waiting with something for you.",
+      successCopy: "good. now follow the music.",
     },
     {
       id: 2,
-      name: "Parcul Cișmigiu",
-      teaser: "the bench where you made That Phone Call in 2022.",
+      name: "Kpop.ro",
+      teaser:
+        "a universe of obsession packed into a tiny shop. bias wreckers welcome.",
       realHint:
-        "head for the big park with the lake and the rowboats. our bench faces the water, near where the swans act like they own the place.",
-      lat: 44.436,
-      lng: 26.0925,
-      radiusMeters: 50,
-      code: "LEBADA",
-      successCopy:
-        "two down. you're almost worthy of a present. last stop: something classy.",
+        "find the street named after the bow. look for the shop that brought seoul to bucharest.",
+      lat: 44.42028875884773,
+      lng: 26.12079480429222,
+      radiusMeters: 25,
+      code: "KPOP",
+      successCopy: "almost there. find the place where the riff never ends.",
     },
     {
       id: 3,
-      name: "Ateneul Român",
-      teaser:
-        "the round building with columns that looks like a greek wedding.",
+      name: "iSleep",
+      teaser: "the end is near. and it promises a good night's sleep.",
       realHint:
-        "look for the domed concert hall with the seated poet statue out front and the fancy old hotel across the way. stand by the steps.",
-      lat: 44.4414,
-      lng: 26.0973,
-      radiusMeters: 50,
-      code: "ENESCU",
+        "find the boulevard of the last dacian king. the shop there invites you to do what you've been avoiding all day.",
+      lat: 44.42757830878356,
+      lng: 26.13161744685325,
+      radiusMeters: 25,
+      code: "SLEEP",
       successCopy:
         "THREE FOR THREE. now scan the QR. find the easybox. open it. don't cry in public.",
     },
@@ -221,19 +213,18 @@ export const config: HuntConfig = {
     headline: "YOU ABSOLUTE LEGEND.",
     subheadline: "one more thing — you're not at the locker yet.",
     lockerHintLabel: "go here:",
-    // Placeholder — drop the real EasyBox QR PNG into public/qr.png too.
-    qrPayload: "https://easybox.sameday.ro/locker/REPLACE_ME",
+    // The displayed QR is the image at public/qr.png — replace that file with
+    // the real EasyBox QR before launch.
     instruction:
       "scan the QR when you get there. try to keep it together in front of strangers.",
     qrBrightnessTip: "tip: max your brightness so the scanner sees it.",
-    saveQrLabel: "save QR to photos",
     openLockerMapLabel: "open in maps",
   },
 
   easyboxLocation: {
-    name: "Easybox Domnița Florica",
-    hint: "strada domnița florica 13. told you to bring the bike. last push, go get it.",
-    mapsUrl: "https://maps.app.goo.gl/diwa77ADVXN1f8SE6",
+    name: "Muse Clinique by Speed Gym",
+    hint: "str. grigore gănescu, nr. 1A. told you to bring the bike. last push, go get it.",
+    mapsUrl: "https://maps.app.goo.gl/vSq7vAci9LvxxXdcA",
   },
 
   errors: {
@@ -241,7 +232,6 @@ export const config: HuntConfig = {
     gpsDenied:
       "your phone won't share your location. cool. cool cool cool. type the codes instead.",
     gpsFlaky: "your phone's a bit lost. waving at satellites...",
-    offline: "you're offline. that's fine, we cached everything. keep going.",
   },
 
   photos: [],
