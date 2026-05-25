@@ -223,7 +223,7 @@ export const config: HuntConfig = {
 
   easyboxLocation: {
     name: "Muse Clinique by Speed Gym",
-    hint: "str. grigore gănescu, nr. 1A. told you to bring the bike. last push, go get it.",
+    hint: "grigore gănescu, nr. 1A. told you to bring the bike. last push, go get it.",
     mapsUrl: "https://maps.app.goo.gl/vSq7vAci9LvxxXdcA",
   },
 
