@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import { config } from '../config';
-import { bigBurst } from '../lib/confettiBurst';
-import { playFinale } from '../lib/sounds';
-import Mascot from '../components/Mascot';
-import type { HuntAction } from '../state/huntReducer';
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { config } from "../config";
+import { bigBurst } from "../lib/confettiBurst";
+import { playFinale } from "../lib/sounds";
+import Mascot from "../components/Mascot";
+import type { HuntAction } from "../state/huntReducer";
 
 type Props = { dispatch: React.Dispatch<HuntAction>; testMode: boolean };
 
-const QR_SRC = `${import.meta.env.BASE_URL}qr.png`;
+const QR_SRC = `${import.meta.env.BASE_URL}qr.jpg`;
 
 /**
  * Finale screen.
@@ -50,7 +50,12 @@ export default function Finale({ dispatch, testMode }: Props) {
           className="finale__headline"
           initial={{ scale: 0.4, opacity: 0, rotate: -6 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
-          transition={{ type: 'spring', stiffness: 420, damping: 16, delay: 0.1 }}
+          transition={{
+            type: "spring",
+            stiffness: 420,
+            damping: 16,
+            delay: 0.1,
+          }}
         >
           {finale.headline}
         </motion.h1>
@@ -92,12 +97,14 @@ export default function Finale({ dispatch, testMode }: Props) {
         <img src={QR_SRC} alt="EasyBox QR" draggable={false} />
         <motion.div
           className="qr-card__scanline"
-          initial={{ y: '-100%' }}
-          animate={{ y: '100%' }}
-          transition={{ duration: 0.8, delay: 2.2, ease: 'linear' }}
+          initial={{ y: "-100%" }}
+          animate={{ y: "100%" }}
+          transition={{ duration: 0.8, delay: 2.2, ease: "linear" }}
           aria-hidden
         />
-        <span className="qr-card__hint" aria-hidden>tap to enlarge</span>
+        <span className="qr-card__hint" aria-hidden>
+          tap to enlarge
+        </span>
       </motion.button>
 
       <motion.div
@@ -112,7 +119,12 @@ export default function Finale({ dispatch, testMode }: Props) {
           duration: 0.9,
           ease: [0.34, 1.8, 0.64, 1],
           delay: 1.5,
-          y: { duration: 0.5, repeat: Infinity, repeatType: 'mirror', delay: 2.2 },
+          y: {
+            duration: 0.5,
+            repeat: Infinity,
+            repeatType: "mirror",
+            delay: 2.2,
+          },
         }}
         aria-hidden
       >
@@ -122,7 +134,10 @@ export default function Finale({ dispatch, testMode }: Props) {
       <p className="finale__instruction">{finale.instruction}</p>
 
       {testMode && (
-        <button className="dev-skip" onClick={() => dispatch({ type: 'RESET' })}>
+        <button
+          className="dev-skip"
+          onClick={() => dispatch({ type: "RESET" })}
+        >
           (dev) reset
         </button>
       )}
@@ -148,10 +163,12 @@ export default function Finale({ dispatch, testMode }: Props) {
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.8 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
             />
             <p className="qr-lightbox__tip">{finale.qrBrightnessTip}</p>
-            <span className="qr-lightbox__hint" aria-hidden>tap anywhere to close</span>
+            <span className="qr-lightbox__hint" aria-hidden>
+              tap anywhere to close
+            </span>
           </motion.div>
         )}
       </AnimatePresence>

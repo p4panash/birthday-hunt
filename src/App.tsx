@@ -1,26 +1,29 @@
-import { useReducer } from 'react';
+import { useReducer } from "react";
 import {
   STORAGE_KEY,
   huntReducer,
   initialState,
   type CheckpointIndex,
   type HuntState,
-} from './state/huntReducer';
-import { loadFromStorage, useLocalStorageSync } from './lib/useLocalStorageSync';
-import { useQrSlices } from './lib/useQrSlices';
-import { detectTestMode } from './lib/testMode';
-import PortraitLock from './components/PortraitLock';
-import CountdownBanner from './components/CountdownBanner';
-import ProgressScaffold from './components/ProgressScaffold';
-import TestModeBadge from './components/TestModeBadge';
-import Intro from './screens/Intro';
-import GpsPreface from './screens/GpsPreface';
-import LocationActive from './screens/LocationActive';
-import Reveal from './screens/Reveal';
-import PhotoInterstitial from './screens/PhotoInterstitial';
-import Finale from './screens/Finale';
+} from "./state/huntReducer";
+import {
+  loadFromStorage,
+  useLocalStorageSync,
+} from "./lib/useLocalStorageSync";
+import { useQrSlices } from "./lib/useQrSlices";
+import { detectTestMode } from "./lib/testMode";
+import PortraitLock from "./components/PortraitLock";
+import CountdownBanner from "./components/CountdownBanner";
+import ProgressScaffold from "./components/ProgressScaffold";
+import TestModeBadge from "./components/TestModeBadge";
+import Intro from "./screens/Intro";
+import GpsPreface from "./screens/GpsPreface";
+import LocationActive from "./screens/LocationActive";
+import Reveal from "./screens/Reveal";
+import PhotoInterstitial from "./screens/PhotoInterstitial";
+import Finale from "./screens/Finale";
 
-const QR_SRC = `${import.meta.env.BASE_URL}qr.png`;
+const QR_SRC = `${import.meta.env.BASE_URL}qr.jpg`;
 
 function init(seed: HuntState): HuntState {
   const stored = loadFromStorage<HuntState | null>(STORAGE_KEY, null);
@@ -34,15 +37,16 @@ export default function App() {
   useLocalStorageSync(STORAGE_KEY, state);
   const sliceUrls = useQrSlices(QR_SRC);
 
-  const showChrome = state.step.kind !== 'intro' && state.step.kind !== 'gps-preface';
+  const showChrome =
+    state.step.kind !== "intro" && state.step.kind !== "gps-preface";
   const currentN = currentCheckpoint(state);
-  const revealingN = state.step.kind === 'reveal' ? state.step.n : null;
+  const revealingN = state.step.kind === "reveal" ? state.step.n : null;
 
   return (
     <PortraitLock>
       <div className="app-shell">
         {showChrome && <CountdownBanner />}
-        {showChrome && state.step.kind !== 'finale' && (
+        {showChrome && state.step.kind !== "finale" && (
           <ProgressScaffold
             sliceUrls={sliceUrls}
             unlocked={state.unlocked}
@@ -61,10 +65,10 @@ export default function App() {
 
 function currentCheckpoint(state: HuntState): CheckpointIndex | null {
   switch (state.step.kind) {
-    case 'location':
-    case 'reveal':
+    case "location":
+    case "reveal":
       return state.step.n;
-    case 'photo':
+    case "photo":
       // After photo, the next location is afterN + 1, capped at 2.
       return Math.min(2, state.step.afterN + 1) as CheckpointIndex;
     default:
@@ -83,13 +87,19 @@ function Router({
 }) {
   const { step } = state;
   switch (step.kind) {
-    case 'intro':
+    case "intro":
       return <Intro dispatch={dispatch} />;
-    case 'gps-preface':
+    case "gps-preface":
       return <GpsPreface dispatch={dispatch} />;
-    case 'location':
-      return <LocationActive dispatch={dispatch} n={step.n} testMode={state.testMode} />;
-    case 'reveal':
+    case "location":
+      return (
+        <LocationActive
+          dispatch={dispatch}
+          n={step.n}
+          testMode={state.testMode}
+        />
+      );
+    case "reveal":
       return (
         <Reveal
           dispatch={dispatch}
@@ -97,9 +107,9 @@ function Router({
           slice={sliceUrls ? sliceUrls[step.n] : null}
         />
       );
-    case 'photo':
+    case "photo":
       return <PhotoInterstitial dispatch={dispatch} afterN={step.afterN} />;
-    case 'finale':
+    case "finale":
       return <Finale dispatch={dispatch} testMode={state.testMode} />;
   }
 }

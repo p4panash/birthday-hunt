@@ -139,8 +139,8 @@ export const config: HuntConfig = {
     allowCta: "allow location",
   },
 
-  // Placeholder: drop-off + 48h. Replace before launch.
-  deadlineISO: "2026-05-26T18:00:00+03:00",
+  // Joi, 28 Mai, ora 1:10.
+  deadlineISO: "2026-05-28T01:10:00+03:00",
   countdown: {
     eyebrow: "tick tock. the locker repossesses your gift in:",
   },
