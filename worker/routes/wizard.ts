@@ -29,6 +29,10 @@ const DraftLine = z.object({
   value: z.string(),
 });
 
+// Enum fields use `.catch(undefined)` so a Claude response with a city the
+// frontend doesn't know about (e.g. "baia-mare") doesn't sink the whole draft.
+// The frontend merges patch into the working draft; undefined fields are
+// skipped, so the user keeps the defaults for those axes.
 const DraftResponse = z.object({
   lines: z.array(DraftLine).length(6),
   patch: z.object({
@@ -45,12 +49,16 @@ const DraftResponse = z.object({
         'kids',
         'just-because',
       ])
-      .optional(),
-    city: z.enum(['cluj', 'buc', 'brasov', 'timisoara']).optional(),
+      .optional()
+      .catch(undefined),
+    city: z
+      .enum(['cluj', 'buc', 'brasov', 'timisoara'])
+      .optional()
+      .catch(undefined),
     area: z.string().optional(),
-    theme: z.string().optional(),
-    stopCount: z.number().int().min(3).max(12).optional(),
-    difficulty: z.enum(['sweet', 'classic', 'cruel']).optional(),
+    theme: z.string().optional().catch(undefined),
+    stopCount: z.number().int().min(3).max(12).optional().catch(undefined),
+    difficulty: z.enum(['sweet', 'classic', 'cruel']).optional().catch(undefined),
   }),
 });
 
@@ -96,19 +104,47 @@ Schema:
   ],
   "patch": {
     "title":      "<short slug, lowercase, e.g. 'andra-bday-2026' or 'lma m1halcea'>",
-    "recipient":  "<first name only>",
-    "occasion":   one of: birthday, anniversary, proposal, bachelor, team, tourist, kids, just-because,
-    "city":       one of: cluj, buc, brasov, timisoara (best guess from the prompt),
-    "area":       "<neighbourhood string, e.g. 'Centru istoric'>",
-    "theme":      one of: firsts, cinema, fairytale, nocturne, sunrise, custom,
-    "stopCount":  integer 3..12,
-    "difficulty": one of: sweet, classic, cruel
+    "recipient":  "<first name OR group name like 'the boyz', 'the squad'>",
+    "occasion":   pick the BEST fit from this list:
+                  - birthday:    any birthday celebration
+                  - anniversary: wedding or relationship anniversary
+                  - proposal:    marriage proposal
+                  - bachelor:    bachelor / bachelorette / hen / stag party
+                  - team:        group adventure for friends, colleagues, "boys' night",
+                                 "girls' weekend", "the boyz", "the squad", "my crew",
+                                 team-building, group quests with no romantic angle
+                  - tourist:     city sightseeing for visitors with no group hook
+                  - kids:        children's party
+                  - just-because: ONLY when none of the above clearly applies
+                  Prefer a specific category over just-because whenever any signal exists.
+  "city":       one of: cluj, buc, brasov, timisoara (best guess from the prompt;
+                if the city named isn't one of these, omit this field),
+  "area":       "<neighbourhood string, e.g. 'Centru istoric'>",
+  "theme":      one of: firsts, cinema, fairytale, nocturne, sunrise, custom,
+  "stopCount":  integer 3..12,
+  "difficulty": one of: sweet, classic, cruel
   }
 }
 
-Defaults when the user doesn't say: city=cluj, area="Centru istoric",
-theme=firsts, stopCount=5, difficulty=sweet. Keep "value" strings under 80
-characters each.`;
+Defaults when the user doesn't say: area="Centru istoric", theme=firsts,
+stopCount=5, difficulty=sweet. Keep "value" strings under 80 characters each.
+
+Worked examples:
+
+prompt: "Boys' night mystery hunt for my crew in Cluj"
+→ patch.occasion: "team", patch.recipient: "the boyz"
+
+prompt: "30th birthday for Andra in Brașov"
+→ patch.occasion: "birthday", patch.recipient: "Andra", patch.city: "brasov"
+
+prompt: "Bachelorette for Maria in București, after dark"
+→ patch.occasion: "bachelor", patch.theme: "nocturne", patch.city: "buc"
+
+prompt: "Walking tour for two visiting friends from Spain"
+→ patch.occasion: "tourist", patch.recipient: "the visitors"
+
+prompt: "Just want something fun for me and my sister"
+→ patch.occasion: "just-because" (only because nothing else fits)`;
 
   let aiResponse;
   try {
