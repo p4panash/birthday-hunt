@@ -184,34 +184,40 @@ Query helpers added to `worker/db/queries.ts`:
 ## WS protocol additions
 
 Extension of `shared/messages.ts`. All envelopes carry `v: 1`. The
-existing union is widened with these new variants:
+discriminator field is `type` (existing convention — flat names,
+no slashes). The existing union is widened with these new variants:
 
 ```ts
 // Client → server
 type ClientMsg =
-  | { v: 1; kind: 'state/action'; action: HuntAction }   // existing
-  | { v: 1; kind: 'chat/send';    body: string }
-  | { v: 1; kind: 'react/send';   emoji: ReactionEmoji }
-  | { v: 1; kind: 'ping/send';    lat: number; lng: number };
+  | { v: 1; type: 'action';     action: HuntAction }   // existing
+  | { v: 1; type: 'ping' }                              // existing (heartbeat)
+  | { v: 1; type: 'chat_send';  body: string }
+  | { v: 1; type: 'react_send'; emoji: ReactionEmoji }
+  | { v: 1; type: 'ping_send';  lat: number; lng: number };
 
 type ReactionEmoji = '🎉' | '❤️' | '🔥' | '😭' | '🙄' | '👀';
 
 // Server → client
 type ServerMsg =
-  | { v: 1; kind: 'state/snapshot'; state: HuntState }       // existing
-  | { v: 1; kind: 'state/update';   state: HuntState }       // existing
-  | { v: 1; kind: 'presence';       players: PlayerPresence[] } // existing
-  | { v: 1; kind: 'chat/snapshot';  messages: ChatMessage[] }
-  | { v: 1; kind: 'chat/new';       message: ChatMessage }
-  | { v: 1; kind: 'chat/wiped' }
-  | { v: 1; kind: 'react/show';     emoji: ReactionEmoji;
-                                     sender_id: string; sender_name: string;
-                                     id: string }
-  | { v: 1; kind: 'ping/show';      lat: number; lng: number;
-                                     sender_id: string; sender_name: string;
-                                     id: string; expires_at: number }
-  | { v: 1; kind: 'error';          code: ErrorCode;
-                                     retry_after_ms?: number };
+  | { v: 1; type: 'state';         state: HuntState }            // existing
+  | { v: 1; type: 'presence';      players: PlayerPresence[] }   // existing
+  | { v: 1; type: 'pong' }                                        // existing
+  | { v: 1; type: 'chat_snapshot'; messages: ChatMessage[] }
+  | { v: 1; type: 'chat_new';      message: ChatMessage }
+  | { v: 1; type: 'chat_wiped' }
+  | { v: 1; type: 'react_show';    emoji: ReactionEmoji;
+                                    sender_id: string; sender_name: string;
+                                    id: string }
+  | { v: 1; type: 'ping_show';     lat: number; lng: number;
+                                    sender_id: string; sender_name: string;
+                                    id: string; expires_at: number }
+  | { v: 1; type: 'error';         code: string;
+                                    message: string;
+                                    retry_after_ms?: number };
+
+// Naming note: the WS heartbeat is already called `ping` in v1, so
+// the map-ping feature uses `ping_send` / `ping_show` to disambiguate.
 
 interface ChatMessage {
   id: number;          // monotonic from D1 autoinc
