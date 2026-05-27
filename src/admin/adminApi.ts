@@ -124,4 +124,19 @@ export function sendTeamAction(huntId: string, teamId: string, action: unknown) 
   );
 }
 
+export interface AuditEntry {
+  id: number;
+  admin_email: string;
+  action: string;
+  target: string;
+  payload_json: string | null;
+  created_at: number;
+}
+
+export function listAuditLog(limit = 100) {
+  return adminFetch<{ entries: AuditEntry[] }>(
+    `/api/admin/audit_log?limit=${limit}`,
+  );
+}
+
 export type { HuntSummary, TeamSummary };

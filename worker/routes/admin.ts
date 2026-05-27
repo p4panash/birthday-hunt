@@ -11,6 +11,7 @@ import {
   getTeamState,
   insertHunt,
   insertTeam,
+  listAuditLog,
   listHunts,
   listPlayersByTeam,
   listTeamsByHunt,
@@ -77,6 +78,24 @@ admin.post('/hunts', async (c) => {
 admin.get('/hunts', async (c) => {
   const rows = await listHunts(c.env.DB);
   return c.json({ hunts: rows.map(huntToResponse) });
+});
+
+admin.get('/audit_log', async (c) => {
+  const limitParam = Number(c.req.query('limit') ?? '100');
+  const limit = Number.isFinite(limitParam) && limitParam > 0 && limitParam <= 500
+    ? Math.floor(limitParam)
+    : 100;
+  const rows = await listAuditLog(c.env.DB, limit);
+  return c.json({
+    entries: rows.map((r) => ({
+      id: r.id,
+      admin_email: r.admin_email,
+      action: r.action,
+      target: r.target,
+      payload_json: r.payload_json,
+      created_at: r.created_at,
+    })),
+  });
 });
 
 admin.get('/hunts/:id', async (c) => {

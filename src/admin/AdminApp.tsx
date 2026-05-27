@@ -8,9 +8,11 @@ import {
   createHunt,
   createTeam,
   getHunt,
+  listAuditLog,
   listHunts,
   patchHunt,
   sendTeamAction,
+  type AuditEntry,
   type HuntSummary,
   type TeamSummary,
 } from './adminApi';
@@ -20,12 +22,14 @@ import './trove.css';
 type View =
   | { kind: 'list' }
   | { kind: 'create' }
-  | { kind: 'detail'; huntId: string };
+  | { kind: 'detail'; huntId: string }
+  | { kind: 'history' };
 
 function parseView(): View {
   const m = window.location.pathname.match(/\/admin\/hunts\/([^/]+)/);
   if (m) return { kind: 'detail', huntId: decodeURIComponent(m[1]) };
   if (window.location.pathname.endsWith('/admin/new')) return { kind: 'create' };
+  if (window.location.pathname.endsWith('/admin/history')) return { kind: 'history' };
   return { kind: 'list' };
 }
 
@@ -34,6 +38,7 @@ function navigate(view: View) {
   if (view.kind === 'create') path = '/admin/new';
   if (view.kind === 'detail')
     path = `/admin/hunts/${encodeURIComponent(view.huntId)}`;
+  if (view.kind === 'history') path = '/admin/history';
   window.history.pushState(null, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
@@ -55,6 +60,7 @@ export default function AdminApp() {
           {view.kind === 'list' && <HuntsList />}
           {view.kind === 'create' && <CreateHunt />}
           {view.kind === 'detail' && <HuntDetail huntId={view.huntId} />}
+          {view.kind === 'history' && <AuditHistory />}
         </main>
       </div>
     </div>
@@ -131,6 +137,13 @@ function Sidebar({ view }: { view: View }) {
         >
           <Icon name="plus" size={14} />
           <span>new hunt</span>
+        </button>
+        <button
+          className={'step ' + (view.kind === 'history' ? 'current' : '')}
+          onClick={() => navigate({ kind: 'history' })}
+        >
+          <Icon name="clock" size={14} />
+          <span>history</span>
         </button>
         {view.kind === 'detail' && (
           <button className="step current">
@@ -487,6 +500,83 @@ const JUMP_TARGETS: Array<{
     action: { type: 'JUMP_TO_STEP', step: { kind: 'finale' } },
   },
 ];
+
+function AuditHistory() {
+  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function reload() {
+      listAuditLog(200)
+        .then((r) => setEntries(r.entries))
+        .catch((e) => setError((e as Error).message));
+    }
+    reload();
+    const id = setInterval(reload, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <PageHeader
+      eyebrow="audit"
+      title="history"
+      intro="every admin mutation is logged with the actor, action, target, and a redacted payload. polls every 5s."
+    >
+      {error && <p className="alert">{error}</p>}
+      {!entries && !error && <p style={{ opacity: 0.6 }}>loading…</p>}
+      {entries && entries.length === 0 && (
+        <p style={{ opacity: 0.7 }}>no admin actions yet.</p>
+      )}
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {entries?.map((e) => (
+          <li
+            key={e.id}
+            className="card"
+            style={{
+              padding: '12px 16px',
+              marginBottom: 8,
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr auto',
+              gap: 12,
+              alignItems: 'baseline',
+            }}
+          >
+            <span
+              className="mono"
+              style={{ fontSize: 11, color: 'var(--muted)' }}
+              title={new Date(e.created_at).toISOString()}
+            >
+              {new Date(e.created_at).toLocaleString()}
+            </span>
+            <div>
+              <span className="chip chip-moss" style={{ marginRight: 8 }}>
+                {e.action}
+              </span>
+              <span style={{ color: 'var(--ink-2)' }}>{e.admin_email}</span>
+              <span style={{ color: 'var(--muted)', marginLeft: 6 }}>
+                → <code className="mono" style={{ fontSize: 11 }}>{e.target}</code>
+              </span>
+              {e.payload_json && (
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 10,
+                    color: 'var(--muted-2)',
+                    marginTop: 4,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {e.payload_json}
+                </div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </PageHeader>
+  );
+}
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;

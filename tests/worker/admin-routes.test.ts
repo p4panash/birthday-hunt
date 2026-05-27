@@ -182,6 +182,38 @@ describe('GET /api/admin/hunts/:id', () => {
   });
 });
 
+describe('GET /api/admin/audit_log', () => {
+  it('returns entries newest-first after admin actions', async () => {
+    await post('/api/admin/hunts', validCreateHunt);
+    await post('/api/admin/hunts', { ...validCreateHunt, name: 'second' });
+
+    const res = await get('/api/admin/audit_log');
+    expect(res.status).toBe(200);
+    const json = await res.json<{
+      entries: Array<{
+        action: string;
+        target: string;
+        admin_email: string;
+        created_at: number;
+      }>;
+    }>();
+    expect(json.entries.length).toBeGreaterThanOrEqual(2);
+    expect(json.entries[0].created_at).toBeGreaterThanOrEqual(
+      json.entries[1].created_at,
+    );
+    expect(json.entries.every((e) => e.admin_email === 'dev@local')).toBe(true);
+  });
+
+  it('respects limit query param', async () => {
+    for (let i = 0; i < 3; i++) {
+      await post('/api/admin/hunts', { ...validCreateHunt, name: `h-${i}` });
+    }
+    const res = await get('/api/admin/audit_log?limit=2');
+    const json = await res.json<{ entries: unknown[] }>();
+    expect(json.entries).toHaveLength(2);
+  });
+});
+
 describe('PATCH /api/admin/hunts/:id', () => {
   it('updates deadline', async () => {
     const create = await (await post('/api/admin/hunts', validCreateHunt))
