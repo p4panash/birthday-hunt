@@ -69,6 +69,26 @@ test.describe('join screen', () => {
     await ctx.close();
   });
 
+  test('/join?invite=CODE pre-fills the invite input', async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto('/join?invite=ABCD1234');
+
+    await expect(page.getByPlaceholder('ABCD1234')).toHaveValue('ABCD1234');
+    await ctx.close();
+  });
+
+  test('/join?invite=abcd1234 auto-uppercases the pre-filled code', async ({
+    browser,
+  }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto('/join?invite=abcd1234');
+
+    await expect(page.getByPlaceholder('ABCD1234')).toHaveValue('ABCD1234');
+    await ctx.close();
+  });
+
   test('valid invite + name lands in team mode', async ({
     browser,
     request,

@@ -500,6 +500,7 @@ function relativeTime(ts: number): string {
 
 function TeamCard({ team }: { team: TeamSummary }) {
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
   const [jumpOpen, setJumpOpen] = useState(false);
   const [jumpBusy, setJumpBusy] = useState(false);
   const [jumpError, setJumpError] = useState<string | null>(null);
@@ -597,8 +598,22 @@ function TeamCard({ team }: { team: TeamSummary }) {
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             }}
+            title="copy just the invite code"
           >
-            <Icon name="copy" size={11} /> {copied ? 'copied!' : 'copy code'}
+            <Icon name="copy" size={11} /> {copied ? 'copied!' : 'code'}
+          </button>
+          <button
+            className="btn btn-terra"
+            style={{ padding: '4px 10px', fontSize: 11 }}
+            onClick={() => {
+              const url = `${window.location.origin}/join?invite=${encodeURIComponent(team.invite_code)}`;
+              void navigator.clipboard?.writeText(url);
+              setShared(true);
+              setTimeout(() => setShared(false), 1800);
+            }}
+            title="copy a one-tap join link"
+          >
+            <Icon name="link" size={11} /> {shared ? 'link copied!' : 'share link'}
           </button>
           <button
             className="btn btn-ghost"

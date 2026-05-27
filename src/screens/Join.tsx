@@ -2,7 +2,7 @@
 // re-binds their player row, and the session lands in localStorage so reloads
 // drop straight back into the team-mode shell.
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, joinTeam } from '../lib/api';
 import { getClientId } from '../lib/clientId';
 import { saveTeamSession } from '../lib/teamSession';
@@ -11,9 +11,35 @@ interface Props {
   onJoined: () => void;
 }
 
+/**
+ * Read ?invite=CODE from the current URL. Uppercased + trimmed. The admin
+ * "share link" button emits this exact format, so a fresh tab opening
+ * /join?invite=ABCD1234 lands with the invite field already populated.
+ */
+function readInviteFromUrl(): string {
+  try {
+    return (
+      new URLSearchParams(window.location.search).get('invite')?.trim().toUpperCase() ?? ''
+    );
+  } catch {
+    return '';
+  }
+}
+
 export default function Join({ onJoined }: Props) {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => readInviteFromUrl());
   const [name, setName] = useState('');
+
+  // If the URL changes mid-session (e.g. user pastes a new invite link), keep
+  // the field in sync.
+  useEffect(() => {
+    function onPop() {
+      const next = readInviteFromUrl();
+      if (next) setCode(next);
+    }
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
