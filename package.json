@@ -19,7 +19,7 @@
     "db:exec": "wrangler d1 execute DB --local --config worker/wrangler.toml",
     "icons:gen": "node scripts/generate-icons.mjs",
     "cap:assets:gen": "node scripts/generate-native-assets.mjs",
-    "cap:assets": "npx @capacitor/assets generate --iconBackgroundColor '#1F1430' --iconBackgroundColorDark '#1F1430' --splashBackgroundColor '#1F1430' --splashBackgroundColorDark '#1F1430'",
+    "cap:assets": "npx @capacitor/assets generate --iconBackgroundColor #1F1430 --iconBackgroundColorDark #1F1430 --splashBackgroundColor #1F1430 --splashBackgroundColorDark #1F1430",
     "cap:add:ios": "npx cap add ios",
     "cap:add:android": "npx cap add android",
     "cap:sync": "npm run build && npx cap sync",

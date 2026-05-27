@@ -49,3 +49,9 @@ android/keystore.properties
 GoogleService-Info.plist
 google-services.json
 .capacitor/
+
+# @capacitor/assets PWA byproducts. The PWA pipeline (vite-plugin-pwa)
+# owns these; cap:assets emits a parallel set at the repo root and a
+# static public/manifest.webmanifest that we don't want.
+/icons/
+/public/manifest.webmanifest
