@@ -32,12 +32,25 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', logger());
 
-// Allow the vite dev server and same-origin Cloudflare Pages. Tighten before
-// production by pinning to the actual Pages domain via env var.
+// Strict CORS allowlist. With `credentials: true`, a reflective origin would
+// let any site mount a cross-origin credentialed fetch — the browser would
+// forward the CF Access cookie and the call would execute under the admin's
+// identity. Only these origins may opt in:
+//   - hunt.use-adonis.com — production
+//   - birthday-hunt-awy.pages.dev — Pages preview / legacy
+//   - localhost:5173 — vite dev (proxies /api/* to wrangler:8787)
+// Same-origin requests (no Origin header) bypass CORS entirely and are fine.
+const ALLOWED_ORIGINS = new Set([
+  'https://hunt.use-adonis.com',
+  'https://birthday-hunt-awy.pages.dev',
+  'http://localhost:5173',
+]);
+
 app.use(
   '/api/*',
   cors({
-    origin: (origin) => origin,
+    origin: (origin) =>
+      origin && ALLOWED_ORIGINS.has(origin) ? origin : null,
     allowHeaders: ['Content-Type', 'Cf-Access-Jwt-Assertion'],
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,

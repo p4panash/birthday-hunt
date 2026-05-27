@@ -204,6 +204,58 @@ describe('POST /api/teams/join', () => {
   });
 });
 
+describe('CORS allowlist', () => {
+  const PROBE = 'http://localhost/api/hunts/anything/config';
+  it('allows hunt.use-adonis.com origin', async () => {
+    const res = await SELF.fetch(PROBE, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://hunt.use-adonis.com',
+        'Access-Control-Request-Method': 'GET',
+      },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBe(
+      'https://hunt.use-adonis.com',
+    );
+  });
+
+  it('allows Pages legacy origin', async () => {
+    const res = await SELF.fetch(PROBE, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://birthday-hunt-awy.pages.dev',
+        'Access-Control-Request-Method': 'GET',
+      },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBe(
+      'https://birthday-hunt-awy.pages.dev',
+    );
+  });
+
+  it('rejects unknown origins by omitting ACAO', async () => {
+    const res = await SELF.fetch(PROBE, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://evil.example.com',
+        'Access-Control-Request-Method': 'GET',
+      },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('does not reflect arbitrary origins (regression)', async () => {
+    const res = await SELF.fetch(PROBE, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://attacker.test',
+        'Access-Control-Request-Method': 'POST',
+      },
+    });
+    const acao = res.headers.get('access-control-allow-origin');
+    expect(acao).not.toBe('https://attacker.test');
+  });
+});
+
 describe('GET /api/teams/:id', () => {
   it('returns team with null state initially', async () => {
     const { teamId } = await seedHuntAndTeam();
