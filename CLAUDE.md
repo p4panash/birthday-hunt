@@ -13,14 +13,22 @@ process is consistent across sessions and across developers.
 
 ## Architecture facts (so the agent stops re-deriving them)
 
+- **Primary domain:** `hunt.use-adonis.com` (CNAME → Pages, proxied).
+  Pages serves the SPA; a Worker route `hunt.use-adonis.com/api/*` sends
+  API traffic to the Worker on the same origin (no CORS).
 - **Frontend:** React 18 + Vite 5 + TypeScript 5 (existing v1), deployed to
-  Cloudflare Pages at `birthday-hunt-awy.pages.dev`.
-- **Backend:** Cloudflare Worker at `birthday-hunt.raduroman94.workers.dev`,
-  written with Hono + Zod + jose, plus one Durable Object per team for
-  WebSocket fan-out.
+  Cloudflare Pages project `birthday-hunt` (also at `birthday-hunt-awy.pages.dev`).
+- **Backend:** Cloudflare Worker `birthday-hunt`, written with Hono + Zod +
+  jose, plus one Durable Object per team for WebSocket fan-out. Also
+  reachable at `birthday-hunt.raduroman94.workers.dev` as a fallback, but
+  that URL returns 401 on admin paths because CF Access only protects
+  `hunt.use-adonis.com`.
 - **DB:** D1 (`birthday-hunt-db`, UUID `1ef8718c-1052-4454-9433-e21c552ddd99`).
-- **Auth:** Cloudflare Access on `/admin/*`. Currently shipped with
-  `ACCESS_DEV_BYPASS=true` secret as a stopgap.
+- **Auth:** Cloudflare Access on `hunt.use-adonis.com/admin*` AND
+  `hunt.use-adonis.com/api/admin*` (one app, both paths). Identity:
+  email OTP (`raduroman94@gmail.com` in the allow policy). Team domain:
+  `billowing-block-06aa.cloudflareaccess.com`. AUD lives as wrangler
+  secret on the Worker.
 - **State machine source of truth:** `shared/state/reducer.ts`. Run by both
   frontend (`useTeamState`) and DO (`TeamSession.applyAction`).
 - **Solo mode is the rollback target.** Never let it regress. The Playwright
