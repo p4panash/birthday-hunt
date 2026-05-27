@@ -43,12 +43,31 @@ export interface SendResult {
   gone: boolean;
 }
 
+// Defense-in-depth SSRF check. The subscribe route validates this too;
+// here we re-check at fetch time so legacy rows (or any future code path
+// that bypasses Zod) can't be weaponised.
+const ALLOWED_HOSTS = new Set([
+  'fcm.googleapis.com',
+  'updates.push.services.mozilla.com',
+  'web.push.apple.com',
+  'wns2-by3p.notify.windows.com',
+  'wns2-bn3p.notify.windows.com',
+  'wns2-am3p.notify.windows.com',
+  'wns2-co4p.notify.windows.com',
+  'wns2-db5p.notify.windows.com',
+  'wns2-pn1p.notify.windows.com',
+]);
+
 export async function sendPush(
   sub: PushSubscriptionShape,
   payload: PushPayload,
   env: PushEnv,
 ): Promise<SendResult> {
-  const audience = new URL(sub.endpoint).origin;
+  const url = new URL(sub.endpoint);
+  if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname.toLowerCase())) {
+    return { ok: false, status: 0, gone: true };
+  }
+  const audience = url.origin;
   const jwt = await signVapidJwt(audience, env);
 
   const body = JSON.stringify(payload);

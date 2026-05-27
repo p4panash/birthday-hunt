@@ -17,9 +17,49 @@ import {
   upsertPushSubscription,
 } from '../db/queries';
 
+// SSRF defense: the Worker fetches the `endpoint` URL when fanning out
+// push payloads. Restricting the host allowlist prevents an attacker who
+// can subscribe (anyone with an invite + valid player_id) from making the
+// Worker call arbitrary URLs (e.g. internal services, CF metadata, etc.).
+//
+// The hosts below cover the major push services. Add (don't replace) when
+// onboarding new platforms.
+const ALLOWED_PUSH_HOSTS = new Set([
+  // Google Chrome / Android
+  'fcm.googleapis.com',
+  // Mozilla Firefox
+  'updates.push.services.mozilla.com',
+  // Apple Safari (iOS 16.4+ PWA push)
+  'web.push.apple.com',
+  // Microsoft Edge (current)
+  'wns2-by3p.notify.windows.com',
+  'wns2-bn3p.notify.windows.com',
+  'wns2-am3p.notify.windows.com',
+  'wns2-co4p.notify.windows.com',
+  'wns2-db5p.notify.windows.com',
+  'wns2-pn1p.notify.windows.com',
+]);
+
+function isAllowedPushEndpoint(rawUrl: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:') return false;
+  return ALLOWED_PUSH_HOSTS.has(u.hostname.toLowerCase());
+}
+
 const SubscribeSchema = z.object({
   player_id: z.string().min(1),
-  endpoint: z.string().url().max(1024),
+  endpoint: z
+    .string()
+    .url()
+    .max(1024)
+    .refine(isAllowedPushEndpoint, {
+      message: 'endpoint host not allowlisted',
+    }),
   keys: z.object({
     p256dh: z.string().min(1).max(256),
     auth: z.string().min(1).max(64),
