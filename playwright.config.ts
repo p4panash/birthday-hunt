@@ -32,7 +32,10 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'npm run worker:dev',
+      // Inject ACCESS_DEV_BYPASS via --var so the suite is self-contained
+      // and doesn't depend on a local .dev.vars file existing.
+      command:
+        'npx wrangler dev --config worker/wrangler.toml --var ACCESS_DEV_BYPASS:true',
       port: 8787,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

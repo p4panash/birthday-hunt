@@ -13,6 +13,7 @@
     "worker:test:watch": "vitest",
     "worker:deploy": "wrangler deploy --config worker/wrangler.toml",
     "e2e": "playwright test",
+    "verify": "npm run typecheck && npm run worker:test && npm run build && npm run e2e",
     "db:migrate": "wrangler d1 migrations apply DB --local --config worker/wrangler.toml",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config worker/wrangler.toml",
     "db:exec": "wrangler d1 execute DB --local --config worker/wrangler.toml"
