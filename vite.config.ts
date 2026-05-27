@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'prompt',
         injectRegister: null, // we register manually from src/pwa/registerSw.ts
+        strategies: 'injectManifest',
+        srcDir: 'src/pwa',
+        filename: 'sw.ts',
         includeAssets: [
           'favicon.ico',
           'qr.jpg',
@@ -58,40 +61,11 @@ export default defineConfig(({ mode }) => {
             },
           ],
         },
-        workbox: {
-          // Pre-cache the app shell + assets. The hashed asset filenames make
-          // cache busting automatic.
+        injectManifest: {
+          // Pre-cache the app shell + assets. Hashed filenames make cache
+          // busting automatic. Runtime caching for OSM tiles and Google
+          // Fonts is wired in src/pwa/sw.ts.
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          // Runtime caching rules.
-          runtimeCaching: [
-            {
-              // OSM tiles — survive offline once cached, refresh in background.
-              urlPattern: /^https:\/\/[abc]\.tile\.openstreetmap\.org\/.*/,
-              handler: 'StaleWhileRevalidate',
-              options: {
-                cacheName: 'osm-tiles',
-                expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
-              },
-            },
-            {
-              // Google Fonts CSS — short cache, network-first to pick up
-              // updates.
-              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/,
-              handler: 'StaleWhileRevalidate',
-              options: { cacheName: 'gfonts-css' },
-            },
-            {
-              // Google Fonts woff2 — long cache, immutable filenames.
-              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'gfonts-woff2',
-                expiration: { maxEntries: 30, maxAgeSeconds: 365 * 24 * 60 * 60 },
-              },
-            },
-          ],
-          // API never cached — chat / state must be live.
-          navigateFallbackDenylist: [/^\/api\//, /^\/admin/],
         },
         devOptions: {
           // The dev SW is helpful for testing installability locally; disable

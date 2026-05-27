@@ -29,13 +29,16 @@ import type {
 import { ClientMsgSchema } from '../../shared/messages';
 import { HuntActionSchema } from '../../shared/state/schema';
 import {
+  deletePushSubscriptionByEndpoint,
   getTeamState,
   insertChatMessage,
+  listPushSubsForTeamExcludingSender,
   listRecentChat,
   wipeChatForTeam,
   writeTeamState,
 } from '../db/queries';
 import { RateLimiter } from '../lib/rate-limits';
+import { sendPush } from '../lib/push';
 import type { Env } from '../index';
 
 interface Attachment {
@@ -351,6 +354,64 @@ export class TeamSession extends DurableObject<Env> {
       created_at: row.created_at,
     };
     this.broadcast({ v: 1, type: 'chat_new', message });
+
+    // Fire-and-forget push to teammates' devices. Failure here must not
+    // block the WS path (chat already broadcast, message persisted).
+    this.fanOutChatPush(message).catch((err) => {
+      console.warn('[push] fanout failed', err);
+    });
+  }
+
+  // ── Push fan-out ──────────────────────────────────────────────────
+
+  private async fanOutChatPush(message: ChatMessage): Promise<void> {
+    const env = this.env;
+    if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_CONTACT) {
+      // Push isn't configured (e.g. local dev). Skip silently.
+      return;
+    }
+    const subs = await listPushSubsForTeamExcludingSender(
+      env.DB,
+      this.teamId,
+      message.player_id,
+    );
+    if (subs.length === 0) return;
+
+    const payload = {
+      title: message.player_name || 'New message',
+      // Truncate body to 100 chars; payload total stays under 4 KB easily.
+      body:
+        message.body.length > 100
+          ? message.body.slice(0, 99) + '…'
+          : message.body,
+      tag: `chat-${this.teamId}`,
+      url: '/',
+    };
+
+    // Push deliveries concurrently. allSettled so a single 410-Gone doesn't
+    // sink the others. Reap dead subscriptions on 404/410.
+    const results = await Promise.allSettled(
+      subs.map((s) =>
+        sendPush(
+          { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth },
+          payload,
+          {
+            VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY!,
+            VAPID_PRIVATE_KEY: env.VAPID_PRIVATE_KEY!,
+            VAPID_CONTACT: env.VAPID_CONTACT!,
+          },
+        ),
+      ),
+    );
+    const deadEndpoints: string[] = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled' && r.value.gone) {
+        deadEndpoints.push(subs[i].endpoint);
+      }
+    });
+    for (const endpoint of deadEndpoints) {
+      await deletePushSubscriptionByEndpoint(env.DB, endpoint).catch(() => {});
+    }
   }
 
   // ── Reaction handler (ephemeral, no D1) ───────────────────────────

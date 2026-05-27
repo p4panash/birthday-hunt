@@ -148,6 +148,7 @@ export default function TeamMode({ session }: Props) {
         presence={presence}
         connected={connected}
         selfPlayerId={session.player_id}
+        teamId={session.team_id}
         onOpenChat={openChat}
         unreadChatCount={unread}
       />

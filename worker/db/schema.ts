@@ -53,3 +53,13 @@ export interface ChatMessageRow {
   body: string;
   created_at: number;
 }
+
+export interface PushSubscriptionRow {
+  id: number;
+  player_id: string;
+  team_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: number;
+}

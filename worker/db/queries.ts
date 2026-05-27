@@ -9,6 +9,7 @@ import type {
   ChatMessageRow,
   HuntRow,
   PlayerRow,
+  PushSubscriptionRow,
   TeamRow,
   TeamStateRow,
 } from './schema';
@@ -357,4 +358,72 @@ export async function wipeChatForTeam(
     .bind(teamId)
     .run();
   return result.meta?.changes ?? 0;
+}
+
+// ---------- push subscriptions ----------
+
+export async function upsertPushSubscription(
+  db: D1Database,
+  input: {
+    player_id: string;
+    team_id: string;
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  },
+): Promise<PushSubscriptionRow> {
+  const created_at = Date.now();
+  // ON CONFLICT(endpoint): refresh the row to keep player_id/team_id current
+  // (e.g. player re-binds after team move). One subscription per endpoint.
+  const row = await db
+    .prepare(
+      `INSERT INTO push_subscriptions
+         (player_id, team_id, endpoint, p256dh, auth, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(endpoint) DO UPDATE SET
+         player_id = excluded.player_id,
+         team_id = excluded.team_id,
+         p256dh = excluded.p256dh,
+         auth = excluded.auth
+       RETURNING *`,
+    )
+    .bind(
+      input.player_id,
+      input.team_id,
+      input.endpoint,
+      input.p256dh,
+      input.auth,
+      created_at,
+    )
+    .first<PushSubscriptionRow>();
+  if (!row) {
+    throw new Error('upsertPushSubscription: RETURNING produced no row');
+  }
+  return row;
+}
+
+export async function deletePushSubscriptionByEndpoint(
+  db: D1Database,
+  endpoint: string,
+): Promise<number> {
+  const r = await db
+    .prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`)
+    .bind(endpoint)
+    .run();
+  return r.meta?.changes ?? 0;
+}
+
+export async function listPushSubsForTeamExcludingSender(
+  db: D1Database,
+  teamId: string,
+  excludePlayerId: string,
+): Promise<PushSubscriptionRow[]> {
+  const r = await db
+    .prepare(
+      `SELECT * FROM push_subscriptions
+       WHERE team_id = ? AND player_id != ?`,
+    )
+    .bind(teamId, excludePlayerId)
+    .all<PushSubscriptionRow>();
+  return r.results ?? [];
 }

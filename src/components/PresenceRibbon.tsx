@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import type { PlayerPresence } from 'shared/messages';
+import PushOptInPill from '../pwa/PushOptInPill';
 
 interface Props {
   presence: PlayerPresence[];
@@ -16,6 +17,8 @@ interface Props {
   /** When provided, renders a chat fab. */
   onOpenChat?: () => void;
   unreadChatCount?: number;
+  /** When provided, renders the push opt-in pill (team mode only). */
+  teamId?: string;
 }
 
 export default function PresenceRibbon({
@@ -24,6 +27,7 @@ export default function PresenceRibbon({
   selfPlayerId,
   onOpenChat,
   unreadChatCount = 0,
+  teamId,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -57,6 +61,9 @@ export default function PresenceRibbon({
         alignItems: 'flex-start',
       }}
     >
+      {teamId && (
+        <PushOptInPill teamId={teamId} playerId={selfPlayerId} />
+      )}
       {onOpenChat && (
         <button
           onClick={onOpenChat}

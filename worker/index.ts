@@ -16,6 +16,7 @@ import { logger } from 'hono/logger';
 import { errorHandler } from './middleware/errors';
 import { adminRoutes } from './routes/admin';
 import { teamRoutes, huntPublicRoutes } from './routes/teams';
+import { pushRoutes } from './routes/push';
 import { TeamSession } from './do/TeamSession';
 
 export { TeamSession };
@@ -26,6 +27,12 @@ export interface Env {
   ACCESS_AUD: string;
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_DEV_BYPASS: string;
+  // VAPID secrets for Web Push (Phase 2). Optional at the type level so the
+  // DO chat handler can short-circuit gracefully if they're not configured
+  // (e.g. local dev without push setup).
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_CONTACT?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -63,6 +70,7 @@ app.get('/healthz', (c) => c.json({ ok: true, ts: Date.now() }));
 app.route('/api/admin', adminRoutes);
 app.route('/api/teams', teamRoutes);
 app.route('/api/hunts', huntPublicRoutes);
+app.route('/api/push', pushRoutes);
 
 app.notFound((c) => {
   if (new URL(c.req.url).pathname.startsWith('/api/')) {
