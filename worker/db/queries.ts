@@ -6,6 +6,7 @@
 
 import type {
   AuditLogRow,
+  ChatMessageRow,
   HuntRow,
   PlayerRow,
   TeamRow,
@@ -302,4 +303,58 @@ export async function listAuditLog(
     .bind(limit)
     .all<AuditLogRow>();
   return result.results ?? [];
+}
+
+// ---------- chat ----------
+
+export async function insertChatMessage(
+  db: D1Database,
+  input: {
+    team_id: string;
+    player_id: string;
+    body: string;
+    created_at?: number;
+  },
+): Promise<ChatMessageRow> {
+  const created_at = input.created_at ?? Date.now();
+  const row = await db
+    .prepare(
+      `INSERT INTO chat_messages (team_id, player_id, body, created_at)
+       VALUES (?, ?, ?, ?)
+       RETURNING id, team_id, player_id, body, created_at`,
+    )
+    .bind(input.team_id, input.player_id, input.body, created_at)
+    .first<ChatMessageRow>();
+  if (!row) {
+    throw new Error('insertChatMessage: RETURNING produced no row');
+  }
+  return row;
+}
+
+export async function listRecentChat(
+  db: D1Database,
+  teamId: string,
+  limit = 50,
+): Promise<ChatMessageRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM chat_messages
+       WHERE team_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT ?`,
+    )
+    .bind(teamId, limit)
+    .all<ChatMessageRow>();
+  return result.results ?? [];
+}
+
+export async function wipeChatForTeam(
+  db: D1Database,
+  teamId: string,
+): Promise<number> {
+  const result = await db
+    .prepare(`DELETE FROM chat_messages WHERE team_id = ?`)
+    .bind(teamId)
+    .run();
+  return result.meta?.changes ?? 0;
 }

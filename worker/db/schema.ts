@@ -45,3 +45,11 @@ export interface AuditLogRow {
   payload_json: string | null;
   created_at: number;
 }
+
+export interface ChatMessageRow {
+  id: number;
+  team_id: string;
+  player_id: string;
+  body: string;
+  created_at: number;
+}
