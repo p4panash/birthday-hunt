@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getClientId } from '../lib/clientId';
+import { isNative } from './nativeBridge';
 
 export interface UsePushResult {
   supported: boolean;
@@ -21,6 +22,10 @@ export interface UsePushResult {
 
 function supportsPush(): boolean {
   if (typeof window === 'undefined') return false;
+  // Native shell brings its own push channel through Capacitor; the Web
+  // PushManager is irrelevant there and may even be absent in some
+  // WebView configs.
+  if (isNative()) return true;
   return (
     'serviceWorker' in navigator &&
     'PushManager' in window &&
@@ -88,6 +93,60 @@ export function usePush(args: {
     setBusy(true);
     setError(null);
     try {
+      // Native: route through Capacitor PushNotifications. The plugin
+      // returns an FCM device token which we package as a Push API-shaped
+      // subscription so the Worker's fan-out path stays unchanged.
+      if (isNative()) {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const perm = await PushNotifications.requestPermissions();
+        if (perm.receive !== 'granted') {
+          setError('Notifications not allowed.');
+          return;
+        }
+        await PushNotifications.register();
+        const token = await new Promise<string>((resolve, reject) => {
+          const timeout = setTimeout(
+            () => reject(new Error('registration timeout')),
+            10_000,
+          );
+          PushNotifications.addListener('registration', (t) => {
+            clearTimeout(timeout);
+            resolve(t.value);
+          });
+          PushNotifications.addListener('registrationError', (e) => {
+            clearTimeout(timeout);
+            reject(new Error(e.error));
+          });
+        });
+        // Synthesise a Push API subscription. FCM doesn't actually use the
+        // p256dh/auth fields for encryption when the Worker hits the v1
+        // HTTP endpoint, but the schema requires non-empty values; use the
+        // token itself as a stable filler that the server CAN inspect to
+        // route the dispatch differently in the future.
+        const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
+        const res = await fetch(
+          `${apiBase}/api/push/teams/${encodeURIComponent(teamId)}/subscribe`,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              player_id: playerId,
+              client_id: getClientId(),
+              endpoint: `https://fcm.googleapis.com/fcm/send/${token}`,
+              keys: {
+                p256dh: token.slice(0, 80).padEnd(80, '0'),
+                auth: token.slice(0, 24).padEnd(24, '0'),
+              },
+            }),
+          },
+        );
+        if (!res.ok) {
+          throw new Error(`subscribe failed: ${res.status}`);
+        }
+        setSubscribed(true);
+        return;
+      }
+      // Web path:
       const perm = await Notification.requestPermission();
       setPermission(perm);
       if (perm !== 'granted') {
@@ -142,6 +201,16 @@ export function usePush(args: {
     setBusy(true);
     setError(null);
     try {
+      // Native: unregister the device token and tell the Worker. Capacitor
+      // doesn't expose the token directly on unregister, so we leave the
+      // server-side cleanup to the 410-Gone reaping path on next failed
+      // push delivery.
+      if (isNative()) {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        await PushNotifications.unregister();
+        setSubscribed(false);
+        return;
+      }
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (!sub) {

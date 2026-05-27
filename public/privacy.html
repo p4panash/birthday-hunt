@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — goodLoot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #1F1430; color: #FFD89C; max-width: 720px; margin: 40px auto; padding: 24px; line-height: 1.6; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    h2 { font-size: 18px; margin-top: 32px; color: #FFC83D; }
+    a { color: #FFC83D; }
+    .updated { opacity: 0.6; font-size: 13px; margin-bottom: 32px; }
+    code { background: rgba(255,216,156,0.1); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: 2026-05-27</p>
+
+  <p>goodLoot ("we", "the app") is a cooperative GPS treasure-hunt platform. This policy describes what data we collect, why, and what we do with it. We collect the minimum needed to run the game.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Invite codes</strong> you enter to join a hunt.</li>
+    <li><strong>Player name</strong> you type at join time — visible to your teammates only.</li>
+    <li><strong>GPS coordinates</strong> while you are actively playing a hunt step that requires location. Coordinates are shared with your teammates in real time and discarded when you leave that step. We do not store historical location data.</li>
+    <li><strong>Chat messages</strong> you send during a hunt — stored for the duration of the hunt, viewable only by your teammates, and wipeable by the hunt's admin.</li>
+    <li><strong>A random device identifier</strong> (<code>client_id</code>, a UUID) so we can recognise your device on reconnect. It is not linked to any external identity.</li>
+    <li><strong>A push-notification token</strong> if you opt in to notifications. Used only to deliver in-hunt notifications (e.g. a teammate sent a chat message).</li>
+  </ul>
+
+  <h2>What we don't collect</h2>
+  <ul>
+    <li>No email, phone number, or other personal identifiers (admins use Cloudflare Access; admin auth is not in scope for player privacy).</li>
+    <li>No advertising identifiers.</li>
+    <li>No analytics SDKs, no third-party tracking pixels, no fingerprinting.</li>
+    <li>No background location. GPS is only read while you are on the in-hunt screen with the app open.</li>
+  </ul>
+
+  <h2>Who we share data with</h2>
+  <p>Your teammates within a hunt see your name, your GPS position (while you are on the location screen), and your chat messages. Nobody outside your team sees any of it. We do not sell or share data with third parties. The push-notification token is sent to the platform push service (Apple, Google) only to deliver notifications you've opted in to.</p>
+
+  <h2>How long we keep it</h2>
+  <ul>
+    <li>Chat: until the hunt is wiped by an admin or the hunt is deleted.</li>
+    <li>Player name + client_id: until the hunt is deleted.</li>
+    <li>Push tokens: until you opt out, you uninstall, or the push service marks the token as invalid (then we delete it automatically).</li>
+    <li>GPS coordinates: ephemeral — never written to durable storage on our side.</li>
+  </ul>
+
+  <h2>Your rights</h2>
+  <p>To remove your data, leave the hunt or ask the hunt admin to delete the team. Uninstalling the native app or clearing browser storage wipes your local <code>client_id</code> and push subscription.</p>
+
+  <h2>Hosting</h2>
+  <p>goodLoot runs on Cloudflare Workers, Durable Objects, D1, and Pages. Data is processed where Cloudflare's edge nodes route it.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or requests: <a href="mailto:raduroman94@gmail.com">raduroman94@gmail.com</a>.</p>
+
+  <p style="margin-top: 48px;"><a href="/">← back to goodLoot</a></p>
+</body>
+</html>

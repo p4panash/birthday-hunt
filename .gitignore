@@ -30,3 +30,22 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 test-results/
+
+# Capacitor — native build outputs and signing artifacts.
+# The `ios/` and `android/` folders ARE committed (Capacitor convention)
+# but build outputs and signing keys are not.
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/build/
+ios/DerivedData/
+ios/.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/keystore.properties
+*.keystore
+*.jks
+GoogleService-Info.plist
+google-services.json
+.capacitor/

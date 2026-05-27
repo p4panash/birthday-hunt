@@ -16,9 +16,26 @@
     "verify": "npm run typecheck && npm run worker:test && npm run build && npm run e2e",
     "db:migrate": "wrangler d1 migrations apply DB --local --config worker/wrangler.toml",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config worker/wrangler.toml",
-    "db:exec": "wrangler d1 execute DB --local --config worker/wrangler.toml"
+    "db:exec": "wrangler d1 execute DB --local --config worker/wrangler.toml",
+    "icons:gen": "node scripts/generate-icons.mjs",
+    "cap:assets:gen": "node scripts/generate-native-assets.mjs",
+    "cap:assets": "npx @capacitor/assets generate --iconBackgroundColor '#1F1430' --iconBackgroundColorDark '#1F1430' --splashBackgroundColor '#1F1430' --splashBackgroundColorDark '#1F1430'",
+    "cap:add:ios": "npx cap add ios",
+    "cap:add:android": "npx cap add android",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:open:ios": "npx cap open ios",
+    "cap:open:android": "npx cap open android",
+    "cap:run:android": "npm run build && npx cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/ios": "^8.3.4",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/push-notifications": "^8.1.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "canvas-confetti": "^1.9.3",
     "hono": "^4.12.23",
     "jose": "^6.2.3",
@@ -29,6 +46,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.3.4",
     "@cloudflare/vitest-pool-workers": "^0.16.10",
     "@cloudflare/workers-types": "^4.20260526.1",
     "@playwright/test": "^1.60.0",
