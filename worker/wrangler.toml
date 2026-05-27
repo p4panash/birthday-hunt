@@ -8,6 +8,9 @@
 name = "birthday-hunt"
 main = "index.ts"
 compatibility_date = "2025-12-01"
+# nodejs_compat enables `node:` builtins (fs, stream, etc.) needed by the
+# Anthropic SDK (used by the Quest Wizard route).
+compatibility_flags = ["nodejs_compat"]
 
 # Disable the free birthday-hunt.<account>.workers.dev URL. Production traffic
 # routes through hunt.use-adonis.com (Worker route on the zone below), so the

@@ -17,6 +17,7 @@ import { errorHandler } from './middleware/errors';
 import { adminRoutes } from './routes/admin';
 import { teamRoutes, huntPublicRoutes } from './routes/teams';
 import { pushRoutes } from './routes/push';
+import { wizardRoutes } from './routes/wizard';
 import { TeamSession } from './do/TeamSession';
 
 export { TeamSession };
@@ -33,6 +34,9 @@ export interface Env {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_CONTACT?: string;
+  // Anthropic API key for the Quest Wizard's AI draft endpoint. Optional —
+  // when absent, the SPA falls back to a canned local draft.
+  ANTHROPIC_API_KEY?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -68,6 +72,7 @@ app.use(
 app.get('/healthz', (c) => c.json({ ok: true, ts: Date.now() }));
 
 app.route('/api/admin', adminRoutes);
+app.route('/api/admin/wizard', wizardRoutes);
 app.route('/api/teams', teamRoutes);
 app.route('/api/hunts', huntPublicRoutes);
 app.route('/api/push', pushRoutes);

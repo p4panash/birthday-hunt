@@ -18,17 +18,20 @@ import {
   type TeamSummary,
 } from './adminApi';
 import Icon from './Icon';
+import QuestWizard from './wizard/QuestWizard';
 import './trove.css';
 
 type View =
   | { kind: 'list' }
   | { kind: 'create' }
+  | { kind: 'wizard' }
   | { kind: 'detail'; huntId: string }
   | { kind: 'history' };
 
 function parseView(): View {
   const m = window.location.pathname.match(/\/admin\/hunts\/([^/]+)/);
   if (m) return { kind: 'detail', huntId: decodeURIComponent(m[1]) };
+  if (window.location.pathname.endsWith('/admin/wizard')) return { kind: 'wizard' };
   if (window.location.pathname.endsWith('/admin/new')) return { kind: 'create' };
   if (window.location.pathname.endsWith('/admin/history')) return { kind: 'history' };
   return { kind: 'list' };
@@ -37,6 +40,7 @@ function parseView(): View {
 function navigate(view: View) {
   let path = '/admin';
   if (view.kind === 'create') path = '/admin/new';
+  if (view.kind === 'wizard') path = '/admin/wizard';
   if (view.kind === 'detail')
     path = `/admin/hunts/${encodeURIComponent(view.huntId)}`;
   if (view.kind === 'history') path = '/admin/history';
@@ -60,6 +64,11 @@ export default function AdminApp() {
         <main className="main">
           {view.kind === 'list' && <HuntsList />}
           {view.kind === 'create' && <CreateHunt />}
+          {view.kind === 'wizard' && (
+            <QuestWizard
+              onCreated={(huntId) => navigate({ kind: 'detail', huntId })}
+            />
+          )}
           {view.kind === 'detail' && <HuntDetail huntId={view.huntId} />}
           {view.kind === 'history' && <AuditHistory />}
         </main>
@@ -140,6 +149,13 @@ function Sidebar({ view }: { view: View }) {
           <span>new hunt</span>
         </button>
         <button
+          className={'step ' + (view.kind === 'wizard' ? 'current' : '')}
+          onClick={() => navigate({ kind: 'wizard' })}
+        >
+          <Icon name="spark" size={14} />
+          <span>quest wizard</span>
+        </button>
+        <button
           className={'step ' + (view.kind === 'history' ? 'current' : '')}
           onClick={() => navigate({ kind: 'history' })}
         >
@@ -182,12 +198,20 @@ function HuntsList() {
       title="all hunts"
       intro="every hunt you've created lives here. tap one to manage teams and edit copy."
       actions={
-        <button
-          className="btn btn-primary"
-          onClick={() => navigate({ kind: 'create' })}
-        >
-          <Icon name="plus" size={14} /> new hunt
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => navigate({ kind: 'create' })}
+          >
+            <Icon name="plus" size={14} /> new hunt
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate({ kind: 'wizard' })}
+          >
+            <Icon name="spark" size={14} /> create with wizard
+          </button>
+        </div>
       }
     >
       {error && <p className="alert">{error}</p>}

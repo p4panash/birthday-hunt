@@ -3,7 +3,7 @@
 
 import type { CSSProperties } from 'react';
 
-type IconName =
+export type IconName =
   | 'map' | 'pin' | 'compass' | 'star' | 'sparkle' | 'lock' | 'gift'
   | 'users' | 'calendar' | 'check' | 'plus' | 'minus' | 'x'
   | 'arrow-r' | 'arrow-l' | 'arrow-down' | 'search' | 'grip' | 'spark'

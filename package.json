@@ -28,6 +28,7 @@
     "cap:run:android": "npm run build && npx cap run android"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.99.0",
     "@capacitor/android": "^8.3.4",
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.3.4",
