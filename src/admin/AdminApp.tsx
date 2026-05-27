@@ -88,7 +88,7 @@ function Sidebar({ view }: { view: View }) {
               textTransform: 'uppercase',
             }}
           >
-            birthday-hunt admin
+            goodLoot admin
           </div>
         </div>
       </div>
@@ -271,7 +271,7 @@ function CreateHunt() {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field
-          label="name (slug, e.g. mihali-bday-2026)"
+          label="name (slug, e.g. anna-bday-2026)"
           hint="lowercase, dashes, no spaces"
         >
           <input

@@ -11,7 +11,7 @@ test.describe('admin SPA', () => {
     const page = await ctx.newPage();
     await page.goto('/admin');
 
-    await expect(page.getByText(/birthday-hunt admin/i)).toBeVisible();
+    await expect(page.getByText(/goodLoot admin/i)).toBeVisible();
     await expect(
       page.getByRole('heading', { name: /all hunts/i }),
     ).toBeVisible();
