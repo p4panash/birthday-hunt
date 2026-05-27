@@ -80,8 +80,10 @@ async function joinAs(page: Page, inviteCode: string, name: string) {
   await page.getByPlaceholder('ABCD1234').fill(inviteCode);
   await page.getByLabel('your name').fill(name);
   await page.getByRole('button', { name: /let's go/i }).click();
-  // After join, we land on the team-mode intro screen.
-  await expect(page.getByText(/happy birthday|let's go/i)).toBeVisible({
+  // After join, we land on the team-mode intro screen. The intro screen
+  // is uniquely identifiable by its eyebrow text — the join screen has
+  // "got a code?" instead.
+  await expect(page.locator('.eyebrow').filter({ hasText: /happy birthday/i })).toBeVisible({
     timeout: 10_000,
   });
 }
@@ -101,16 +103,13 @@ test.describe('cooperative play', () => {
     await joinAs(pageA, inviteCode, 'andi');
     await joinAs(pageB, inviteCode, 'bogdan');
 
-    // Both tabs are on intro. Trigger START_HUNT from A.
+    // Both tabs are on intro. Trigger START_HUNT from A via the "let's go" CTA.
     await pageA.getByRole('button', { name: /let's go/i }).click();
 
-    // Both should advance to GpsPreface ("we need to know where you are.")
-    await expect(
-      pageA.getByText(/we need to know where you are/i),
-    ).toBeVisible({ timeout: 5_000 });
-    await expect(
-      pageB.getByText(/we need to know where you are/i),
-    ).toBeVisible({ timeout: 5_000 });
+    // Both should advance to GpsPreface, identifiable by its serif headline.
+    const gpsHeadline = /we need to know where you are/i;
+    await expect(pageA.getByText(gpsHeadline)).toBeVisible({ timeout: 5_000 });
+    await expect(pageB.getByText(gpsHeadline)).toBeVisible({ timeout: 5_000 });
 
     await ctxA.close();
     await ctxB.close();
@@ -128,9 +127,10 @@ test.describe('cooperative play', () => {
 
     await page.reload();
 
-    // Without re-entering the code, we should still land in team mode.
+    // Without re-entering the code, we should still land in team mode — same
+    // intro screen, identifiable by its eyebrow.
     await expect(
-      page.getByText(/happy birthday|let's go/i),
+      page.locator('.eyebrow').filter({ hasText: /happy birthday/i }),
     ).toBeVisible({ timeout: 10_000 });
     await ctx.close();
   });
