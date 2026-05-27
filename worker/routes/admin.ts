@@ -141,6 +141,38 @@ admin.patch('/hunts/:id', async (c) => {
 
 // ── Teams ────────────────────────────────────────────────────────────
 
+// ── Team override: admin can jump a team to a specific step ─────────
+
+admin.post('/hunts/:huntId/teams/:teamId/action', async (c) => {
+  const adminIdentity = c.get('admin');
+  const huntId = c.req.param('huntId');
+  const teamId = c.req.param('teamId');
+  const body = (await c.req.json()) as { action?: unknown };
+
+  // Forward to the team's Durable Object via internal endpoint.
+  const doId = c.env.TEAM_SESSION.idFromName(teamId);
+  const stub = c.env.TEAM_SESSION.get(doId);
+  const doRes = await stub.fetch('http://internal/internal/action', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: body.action }),
+  });
+  const doBody = await doRes.text();
+
+  if (doRes.ok) {
+    await appendAuditLog(c.env.DB, {
+      admin_email: adminIdentity.email,
+      action: 'team_action',
+      target: teamId,
+      payload_json: JSON.stringify({ hunt_id: huntId, action: body.action }),
+    });
+  }
+  return new Response(doBody, {
+    status: doRes.status,
+    headers: { 'content-type': 'application/json' },
+  });
+});
+
 admin.post('/hunts/:huntId/teams', async (c) => {
   const admin = c.get('admin');
   const huntId = c.req.param('huntId');

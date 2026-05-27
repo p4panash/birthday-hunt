@@ -106,4 +106,14 @@ export function createTeam(huntId: string, name: string) {
   );
 }
 
+export function sendTeamAction(huntId: string, teamId: string, action: unknown) {
+  return adminFetch<{ state: unknown }>(
+    `/api/admin/hunts/${encodeURIComponent(huntId)}/teams/${encodeURIComponent(teamId)}/action`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    },
+  );
+}
+
 export type { HuntSummary, TeamSummary };

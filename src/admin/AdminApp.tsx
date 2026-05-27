@@ -10,6 +10,7 @@ import {
   getHunt,
   listHunts,
   patchHunt,
+  sendTeamAction,
   type HuntSummary,
   type TeamSummary,
 } from './adminApi';
@@ -471,8 +472,27 @@ function HuntDetail({ huntId }: { huntId: string }) {
   );
 }
 
+const JUMP_TARGETS: Array<{
+  label: string;
+  action: { type: string; [k: string]: unknown };
+}> = [
+  { label: '⏮ reset to intro', action: { type: 'RESET' } },
+  { label: '▶ start hunt', action: { type: 'START_HUNT' } },
+  { label: '📍 grant GPS', action: { type: 'GRANT_GPS' } },
+  { label: '🔓 unlock 1', action: { type: 'UNLOCK_CHECKPOINT', n: 0 } },
+  { label: '🔓 unlock 2', action: { type: 'UNLOCK_CHECKPOINT', n: 1 } },
+  { label: '🔓 unlock 3', action: { type: 'UNLOCK_CHECKPOINT', n: 2 } },
+  {
+    label: '🏁 jump to finale',
+    action: { type: 'JUMP_TO_STEP', step: { kind: 'finale' } },
+  },
+];
+
 function TeamCard({ team }: { team: TeamSummary }) {
   const [copied, setCopied] = useState(false);
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const [jumpBusy, setJumpBusy] = useState(false);
+  const [jumpError, setJumpError] = useState<string | null>(null);
   const stepLabel = team.step ?? 'intro';
   const unlocked = team.unlocked_count ?? 0;
   return (
@@ -517,6 +537,7 @@ function TeamCard({ team }: { team: TeamSummary }) {
           flexDirection: 'column',
           alignItems: 'flex-end',
           gap: 6,
+          position: 'relative',
         }}
       >
         <span
@@ -525,17 +546,77 @@ function TeamCard({ team }: { team: TeamSummary }) {
         >
           {team.invite_code}
         </span>
-        <button
-          className="btn btn-ghost"
-          style={{ padding: '4px 10px', fontSize: 11 }}
-          onClick={() => {
-            void navigator.clipboard?.writeText(team.invite_code);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          }}
-        >
-          <Icon name="copy" size={11} /> {copied ? 'copied!' : 'copy code'}
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px 10px', fontSize: 11 }}
+            onClick={() => {
+              void navigator.clipboard?.writeText(team.invite_code);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+          >
+            <Icon name="copy" size={11} /> {copied ? 'copied!' : 'copy code'}
+          </button>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px 10px', fontSize: 11 }}
+            onClick={() => setJumpOpen((v) => !v)}
+            title="jump this team to a step (debug)"
+          >
+            <Icon name="settings" size={11} /> jump
+          </button>
+        </div>
+        {jumpOpen && (
+          <div
+            className="card"
+            style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: 6,
+              padding: 8,
+              minWidth: 180,
+              zIndex: 10,
+              boxShadow: 'var(--shadow-2)',
+            }}
+          >
+            {JUMP_TARGETS.map((t) => (
+              <button
+                key={t.label}
+                disabled={jumpBusy}
+                className="step"
+                style={{ width: '100%', fontSize: 12, padding: '6px 8px' }}
+                onClick={async () => {
+                  setJumpBusy(true);
+                  setJumpError(null);
+                  try {
+                    await sendTeamAction(team.hunt_id, team.id, t.action);
+                    setJumpOpen(false);
+                  } catch (e) {
+                    setJumpError((e as Error).message);
+                  } finally {
+                    setJumpBusy(false);
+                  }
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+            {jumpError && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--terra-2)',
+                  marginTop: 6,
+                  padding: '4px 8px',
+                }}
+              >
+                {jumpError}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </li>
   );

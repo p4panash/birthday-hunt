@@ -23,6 +23,7 @@ import type {
 } from '../../shared/state/types';
 import type { PlayerPresence, ServerMsg } from '../../shared/messages';
 import { ClientMsgSchema } from '../../shared/messages';
+import { HuntActionSchema } from '../../shared/state/schema';
 import { getTeamState, writeTeamState } from '../db/queries';
 import type { Env } from '../index';
 
@@ -98,6 +99,27 @@ export class TeamSession extends DurableObject<Env> {
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get('upgrade') === 'websocket') {
       return this.handleUpgrade(request);
+    }
+    const url = new URL(request.url);
+    // Internal admin RPC: apply an action directly without going through the
+    // WebSocket. The admin SPA POSTs here via stub.fetch when an operator
+    // jumps a team to a specific step.
+    if (url.pathname === '/internal/action' && request.method === 'POST') {
+      let body: { action?: unknown };
+      try {
+        body = (await request.json()) as { action?: unknown };
+      } catch {
+        return new Response('bad json', { status: 400 });
+      }
+      const parsed = HuntActionSchema.safeParse(body.action);
+      if (!parsed.success) {
+        return new Response(
+          JSON.stringify({ error: 'invalid action', issues: parsed.error.issues }),
+          { status: 400, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      const next = await this.applyAction(parsed.data);
+      return Response.json({ state: next });
     }
     return new Response('not found', { status: 404 });
   }
