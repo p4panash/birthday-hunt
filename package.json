@@ -7,20 +7,36 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json",
+    "worker:dev": "wrangler dev --config worker/wrangler.toml",
+    "worker:test": "vitest run",
+    "worker:test:watch": "vitest",
+    "worker:deploy": "wrangler deploy --config worker/wrangler.toml",
+    "e2e": "playwright test",
+    "db:migrate": "wrangler d1 migrations apply DB --local --config worker/wrangler.toml",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config worker/wrangler.toml",
+    "db:exec": "wrangler d1 execute DB --local --config worker/wrangler.toml"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.3",
+    "hono": "^4.12.23",
+    "jose": "^6.2.3",
+    "motion": "^11.11.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "motion": "^11.11.0",
-    "canvas-confetti": "^1.9.3"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.10",
+    "@cloudflare/workers-types": "^4.20260526.1",
+    "@playwright/test": "^1.60.0",
+    "@types/canvas-confetti": "^1.6.4",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@types/canvas-confetti": "^1.6.4",
     "@vitejs/plugin-react": "^4.3.3",
     "typescript": "^5.6.3",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "vitest": "^4.1.7",
+    "wrangler": "^4.95.0"
   }
 }

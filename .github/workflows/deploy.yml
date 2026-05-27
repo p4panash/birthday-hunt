@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
+# Disabled by default — primary deploy target is Cloudflare Pages (see DEPLOY.md).
+# Kept as a fallback for rolling back to v1 solo mode if the multiplayer pivot
+# proves unshippable. Trigger manually from the Actions tab when needed.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -29,6 +30,8 @@ jobs:
       - run: npm ci
 
       - run: npm run build
+        env:
+          VITE_BASE_PATH: /birthday-hunt/
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,0 +1,28 @@
+# Cloudflare Worker config for the birthday-hunt multiplayer backend.
+# Run from repo root: `npm run worker:dev`.
+#
+# The `database_id` placeholder is valid for local dev (`--local` mode uses a
+# local SQLite file under .wrangler/state/). For production, run
+# `wrangler d1 create birthday-hunt-db` and replace the placeholder.
+
+name = "birthday-hunt"
+main = "index.ts"
+compatibility_date = "2025-12-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "birthday-hunt-db"
+database_id = "1ef8718c-1052-4454-9433-e21c552ddd99"
+migrations_dir = "db/migrations"
+
+[[durable_objects.bindings]]
+name = "TEAM_SESSION"
+class_name = "TeamSession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TeamSession"]
+
+# ACCESS_AUD, ACCESS_TEAM_DOMAIN, ACCESS_DEV_BYPASS are NOT declared as [vars]
+# so they can be set as wrangler secrets in production. Locally, `.dev.vars`
+# provides them. Tests inject via miniflare bindings.

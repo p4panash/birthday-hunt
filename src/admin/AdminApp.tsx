@@ -1,0 +1,645 @@
+// Trove-styled admin SPA. Tokens + components ported from
+// treasure-hunt-ui-source/. Same three views as before (list / create / detail)
+// but wrapped in the Trove sidebar shell.
+
+import { useCallback, useEffect, useState } from 'react';
+import { config as soloConfig } from '../config';
+import {
+  createHunt,
+  createTeam,
+  getHunt,
+  listHunts,
+  patchHunt,
+  type HuntSummary,
+  type TeamSummary,
+} from './adminApi';
+import Icon from './Icon';
+import './trove.css';
+
+type View =
+  | { kind: 'list' }
+  | { kind: 'create' }
+  | { kind: 'detail'; huntId: string };
+
+function parseView(): View {
+  const m = window.location.pathname.match(/\/admin\/hunts\/([^/]+)/);
+  if (m) return { kind: 'detail', huntId: decodeURIComponent(m[1]) };
+  if (window.location.pathname.endsWith('/admin/new')) return { kind: 'create' };
+  return { kind: 'list' };
+}
+
+function navigate(view: View) {
+  let path = '/admin';
+  if (view.kind === 'create') path = '/admin/new';
+  if (view.kind === 'detail')
+    path = `/admin/hunts/${encodeURIComponent(view.huntId)}`;
+  window.history.pushState(null, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+export default function AdminApp() {
+  const [view, setView] = useState<View>(() => parseView());
+
+  useEffect(() => {
+    const onPop = () => setView(parseView());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  return (
+    <div className="trove">
+      <div className="shell">
+        <Sidebar view={view} />
+        <main className="main">
+          {view.kind === 'list' && <HuntsList />}
+          {view.kind === 'create' && <CreateHunt />}
+          {view.kind === 'detail' && <HuntDetail huntId={view.huntId} />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ── Shell ────────────────────────────────────────────────────────────
+
+function Sidebar({ view }: { view: View }) {
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">T</div>
+        <div>
+          <div className="serif" style={{ fontSize: 19, lineHeight: 1 }}>
+            Trove
+          </div>
+          <div
+            className="mono"
+            style={{
+              fontSize: 9.5,
+              color: 'var(--muted)',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+            }}
+          >
+            birthday-hunt admin
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 28, marginBottom: 18 }}>
+        <div className="label" style={{ marginBottom: 4 }}>
+          Admin
+        </div>
+        <div
+          className="serif"
+          style={{ fontSize: 22, lineHeight: 1.1, color: 'var(--ink)' }}
+        >
+          Hunts dashboard
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--muted)',
+            marginTop: 4,
+            fontStyle: 'italic',
+            fontFamily: 'var(--serif)',
+          }}
+        >
+          create, edit, share invite codes
+        </div>
+      </div>
+
+      <nav
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          marginTop: 4,
+        }}
+      >
+        <button
+          className={'step ' + (view.kind === 'list' ? 'current' : '')}
+          onClick={() => navigate({ kind: 'list' })}
+        >
+          <Icon name="map" size={14} />
+          <span>all hunts</span>
+        </button>
+        <button
+          className={'step ' + (view.kind === 'create' ? 'current' : '')}
+          onClick={() => navigate({ kind: 'create' })}
+        >
+          <Icon name="plus" size={14} />
+          <span>new hunt</span>
+        </button>
+        {view.kind === 'detail' && (
+          <button className="step current">
+            <Icon name="edit" size={14} />
+            <span>hunt detail</span>
+          </button>
+        )}
+      </nav>
+
+      <div
+        className="hairline"
+        style={{ paddingTop: 14, marginTop: 14, fontSize: 11, color: 'var(--muted)' }}
+      >
+        live · polls every 2s
+      </div>
+    </aside>
+  );
+}
+
+// ── Views ────────────────────────────────────────────────────────────
+
+function HuntsList() {
+  const [hunts, setHunts] = useState<HuntSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listHunts()
+      .then((r) => setHunts(r.hunts))
+      .catch((e) => setError((e as Error).message));
+  }, []);
+
+  return (
+    <PageHeader
+      eyebrow="hunts"
+      title="all hunts"
+      intro="every hunt you've created lives here. tap one to manage teams and edit copy."
+      actions={
+        <button
+          className="btn btn-primary"
+          onClick={() => navigate({ kind: 'create' })}
+        >
+          <Icon name="plus" size={14} /> new hunt
+        </button>
+      }
+    >
+      {error && <p className="alert">{error}</p>}
+      {!hunts && !error && <p style={{ opacity: 0.6 }}>loading…</p>}
+      {hunts && hunts.length === 0 && (
+        <p style={{ opacity: 0.7 }}>no hunts yet — create your first.</p>
+      )}
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {hunts?.map((h) => (
+          <li
+            key={h.id}
+            className="card"
+            style={{
+              padding: '16px 20px',
+              marginBottom: 10,
+              cursor: 'pointer',
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              alignItems: 'baseline',
+            }}
+            onClick={() => navigate({ kind: 'detail', huntId: h.id })}
+          >
+            <div>
+              <div
+                className="serif"
+                style={{ fontSize: 22, lineHeight: 1.1 }}
+              >
+                {h.name}
+              </div>
+              <div
+                style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}
+              >
+                for {h.friend_name} · deadline{' '}
+                <span className="mono" style={{ fontSize: 11 }}>
+                  {h.deadline_iso}
+                </span>
+              </div>
+            </div>
+            <div className="chip chip-mono">{h.id.slice(0, 8)}</div>
+          </li>
+        ))}
+      </ul>
+    </PageHeader>
+  );
+}
+
+function CreateHunt() {
+  const [name, setName] = useState('');
+  const [friendName, setFriendName] = useState(soloConfig.friendName);
+  const [deadline, setDeadline] = useState(soloConfig.deadlineISO);
+  const [configJson, setConfigJson] = useState(() =>
+    JSON.stringify(soloConfig, null, 2),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const parsedConfig = JSON.parse(configJson);
+      const res = await createHunt({
+        name: name.trim(),
+        friend_name: friendName.trim(),
+        deadline_iso: deadline.trim(),
+        config: parsedConfig,
+      });
+      navigate({ kind: 'detail', huntId: res.hunt.id });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }, [name, friendName, deadline, configJson]);
+
+  return (
+    <PageHeader
+      eyebrow="step 01"
+      title="new hunt"
+      intro="basics first — the name, the recipient, when the locker takes the gift back. config below is pre-filled from your solo defaults."
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Field
+          label="name (slug, e.g. mihali-bday-2026)"
+          hint="lowercase, dashes, no spaces"
+        >
+          <input
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field>
+        <Field label="friend name" hint="who's the hunt for?">
+          <input
+            className="input"
+            value={friendName}
+            onChange={(e) => setFriendName(e.target.value)}
+          />
+        </Field>
+        <Field
+          label="deadline (ISO 8601)"
+          hint="when the locker auto-returns the gift — drives the countdown banner"
+        >
+          <input
+            className="input mono"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+          />
+        </Field>
+        <Field
+          label="hunt config (JSON)"
+          hint="checkpoints, copy, easybox location — everything in src/config.ts"
+        >
+          <textarea
+            className="textarea mono-textarea"
+            value={configJson}
+            onChange={(e) => setConfigJson(e.target.value)}
+            rows={18}
+          />
+        </Field>
+        {error && <p className="alert">{error}</p>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => navigate({ kind: 'list' })}
+          >
+            <Icon name="arrow-l" size={14} /> back
+          </button>
+          <div style={{ flex: 1 }} />
+          <button
+            className="btn btn-terra"
+            onClick={submit}
+            disabled={busy || !name || !friendName}
+          >
+            {busy ? 'creating…' : 'create hunt'} <Icon name="send" size={14} />
+          </button>
+        </div>
+      </div>
+    </PageHeader>
+  );
+}
+
+function HuntDetail({ huntId }: { huntId: string }) {
+  const [data, setData] = useState<{
+    hunt: HuntSummary;
+    teams: TeamSummary[];
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [deadlineDraft, setDeadlineDraft] = useState('');
+  const [savingDeadline, setSavingDeadline] = useState(false);
+
+  const reload = useCallback(() => {
+    getHunt(huntId)
+      .then((r) => {
+        setData(r);
+        setDeadlineDraft((current) => current || r.hunt.deadline_iso);
+      })
+      .catch((e) => setError((e as Error).message));
+  }, [huntId]);
+
+  useEffect(() => {
+    reload();
+    const id = setInterval(reload, 2000);
+    return () => clearInterval(id);
+  }, [reload]);
+
+  if (error) return <p className="alert">{error}</p>;
+  if (!data) return <p style={{ opacity: 0.6 }}>loading…</p>;
+
+  return (
+    <PageHeader
+      eyebrow="hunt"
+      title={data.hunt.name}
+      intro={
+        <>
+          for <strong>{data.hunt.friend_name}</strong> · teams update live every 2s
+        </>
+      }
+      actions={
+        <button
+          className="btn btn-ghost"
+          onClick={() => navigate({ kind: 'list' })}
+        >
+          <Icon name="arrow-l" size={14} /> back to hunts
+        </button>
+      }
+    >
+      <section
+        className="card"
+        style={{
+          padding: 20,
+          marginBottom: 20,
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr auto',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <span className="label">
+          <Icon name="clock" size={11} style={{ marginRight: 4 }} /> deadline
+        </span>
+        <input
+          className="input mono"
+          value={deadlineDraft}
+          onChange={(e) => setDeadlineDraft(e.target.value)}
+          style={{ fontSize: 13 }}
+        />
+        <button
+          className="btn btn-primary"
+          disabled={savingDeadline}
+          onClick={async () => {
+            setSavingDeadline(true);
+            try {
+              await patchHunt(huntId, { deadline_iso: deadlineDraft });
+              reload();
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setSavingDeadline(false);
+            }
+          }}
+        >
+          {savingDeadline ? 'saving…' : 'save'}
+        </button>
+      </section>
+
+      <section>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            marginBottom: 10,
+          }}
+        >
+          <h3
+            className="serif"
+            style={{ fontSize: 24, margin: 0, lineHeight: 1.1 }}
+          >
+            teams
+          </h3>
+          <span
+            className="chip chip-moss chip-mono"
+            style={{ fontSize: 10 }}
+          >
+            <Icon name="users" size={10} /> {data.teams.length}
+          </span>
+        </div>
+
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {data.teams.map((t) => (
+            <TeamCard key={t.id} team={t} />
+          ))}
+          {data.teams.length === 0 && (
+            <li
+              className="card"
+              style={{ padding: 16, opacity: 0.6, textAlign: 'center' }}
+            >
+              no teams yet — create the first one below.
+            </li>
+          )}
+        </ul>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            marginTop: 14,
+          }}
+        >
+          <input
+            className="input"
+            value={newTeamName}
+            placeholder="team name (e.g. team-coral)"
+            onChange={(e) => setNewTeamName(e.target.value)}
+          />
+          <button
+            className="btn btn-terra"
+            disabled={!newTeamName.trim()}
+            onClick={async () => {
+              try {
+                await createTeam(huntId, newTeamName.trim());
+                setNewTeamName('');
+                reload();
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            }}
+          >
+            <Icon name="plus" size={14} /> add team
+          </button>
+        </div>
+      </section>
+    </PageHeader>
+  );
+}
+
+function TeamCard({ team }: { team: TeamSummary }) {
+  const [copied, setCopied] = useState(false);
+  const stepLabel = team.step ?? 'intro';
+  const unlocked = team.unlocked_count ?? 0;
+  return (
+    <li
+      className="card"
+      style={{
+        padding: '14px 18px',
+        marginBottom: 10,
+        display: 'grid',
+        gridTemplateColumns: '1fr auto',
+        gap: 14,
+        alignItems: 'center',
+      }}
+    >
+      <div>
+        <div className="serif" style={{ fontSize: 20, lineHeight: 1.1 }}>
+          {team.name}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            marginTop: 6,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span className="chip">
+            <Icon name="users" size={11} /> {team.players ?? 0}{' '}
+            {(team.players ?? 0) === 1 ? 'player' : 'players'}
+          </span>
+          <span className="chip chip-moss">
+            <Icon name="walking" size={11} /> {stepLabel}
+          </span>
+          <span className="chip chip-terra">
+            <Icon name="qr" size={11} /> {unlocked}/3 unlocked
+          </span>
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: 6,
+        }}
+      >
+        <span
+          className="mono"
+          style={{ fontSize: 20, letterSpacing: 3, fontWeight: 500 }}
+        >
+          {team.invite_code}
+        </span>
+        <button
+          className="btn btn-ghost"
+          style={{ padding: '4px 10px', fontSize: 11 }}
+          onClick={() => {
+            void navigator.clipboard?.writeText(team.invite_code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          <Icon name="copy" size={11} /> {copied ? 'copied!' : 'copy code'}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+// ── Atoms ────────────────────────────────────────────────────────────
+
+function PageHeader({
+  eyebrow,
+  title,
+  intro,
+  actions,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  intro?: React.ReactNode;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ maxWidth: 860 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 14,
+          marginBottom: 6,
+        }}
+      >
+        <div
+          className="mono"
+          style={{
+            fontSize: 11,
+            color: 'var(--muted)',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {eyebrow}
+        </div>
+        <div
+          style={{ width: 28, height: 1, background: 'var(--line-2)' }}
+        />
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 18,
+          marginBottom: 22,
+        }}
+      >
+        <h1
+          className="serif"
+          style={{ fontSize: 44, lineHeight: 1.05, margin: 0, flex: 1 }}
+        >
+          {title}
+        </h1>
+        {actions && <div style={{ paddingTop: 6 }}>{actions}</div>}
+      </div>
+      {intro && (
+        <p
+          style={{
+            fontSize: 16,
+            color: 'var(--muted)',
+            maxWidth: 540,
+            margin: '0 0 28px 0',
+            lineHeight: 1.5,
+          }}
+        >
+          {intro}
+        </p>
+      )}
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="label">{label}</span>
+      {children}
+      {hint && (
+        <span
+          style={{
+            fontSize: 12,
+            color: 'var(--muted-2)',
+            fontStyle: 'italic',
+            fontFamily: 'var(--serif)',
+          }}
+        >
+          {hint}
+        </span>
+      )}
+    </label>
+  );
+}
