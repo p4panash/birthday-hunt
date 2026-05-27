@@ -1,5 +1,7 @@
 // Kickoff — single-prompt entry. User writes one paragraph; the Worker calls
-// Claude with a structured schema; we stream the lines back as they arrive.
+// Claude with tool-use and streams the partial JSON back as Server-Sent
+// Events. Each `line` event reveals one row of the draft preview the instant
+// the model finishes writing it — the feel is "watching Claude think out loud".
 //
 // Falls back to a canned local draft if the Worker is unreachable so the
 // designer-facing demo still works without a key.
@@ -15,40 +17,73 @@ interface Props {
   onSkip: () => void;
 }
 
+type LineId = 'occasion' | 'city' | 'theme' | 'shape' | 'stops' | 'reward';
+
 interface DraftLine {
-  id: 'occasion' | 'city' | 'theme' | 'shape' | 'stops' | 'reward';
+  id: LineId;
   label: string;
   value: string;
 }
 
-const LOCAL_FALLBACK: DraftLine[] = [
-  { id: 'occasion', label: 'Occasion',        value: 'Birthday · Mihaela · 14 Jun 2026' },
-  { id: 'city',     label: 'City',            value: 'Cluj-Napoca · Centru istoric (1.8 km loop)' },
-  { id: 'theme',    label: 'Theme',           value: 'A book of firsts — romantic, 5 stops' },
-  { id: 'shape',    label: 'Pace',            value: 'Sweet difficulty · ~1h 30m · 5,400 steps' },
-  { id: 'stops',    label: 'Suggested stops', value: 'Klausenburg → Cărturești → Parcul Central → Insomnia → Cetățuia' },
-  { id: 'reward',   label: 'Finale',          value: 'Locker on Cetățuia · code 07-23-14 · warm hand-written note' },
-];
+const LINE_ORDER: LineId[] = ['occasion', 'city', 'theme', 'shape', 'stops', 'reward'];
+
+const LINE_LABELS: Record<LineId, string> = {
+  occasion: 'Occasion',
+  city: 'City',
+  theme: 'Theme',
+  shape: 'Pace',
+  stops: 'Suggested stops',
+  reward: 'Finale',
+};
+
+const LOCAL_FALLBACK: Record<LineId, string> = {
+  occasion: 'Birthday · Mihaela · 14 Jun 2026',
+  city: 'Cluj-Napoca · Centru istoric (1.8 km loop)',
+  theme: 'A book of firsts — romantic, 5 stops',
+  shape: 'Sweet difficulty · ~1h 30m · 5,400 steps',
+  stops: 'Klausenburg → Cărturești → Parcul Central → Insomnia → Cetățuia',
+  reward: 'Locker on Cetățuia · code 07-23-14 · warm hand-written note',
+};
 
 export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
   const [prompt, setPrompt] = useState('');
   const [phase, setPhase] = useState<'idle' | 'thinking' | 'done' | 'error'>('idle');
-  const [lines, setLines] = useState<DraftLine[]>(LOCAL_FALLBACK);
-  const [revealed, setRevealed] = useState<DraftLine['id'][]>([]);
+  // Lines arrive over SSE keyed by id. Display order is fixed by LINE_ORDER.
+  const [lineMap, setLineMap] = useState<Record<LineId, string | null>>({
+    occasion: null, city: null, theme: null, shape: null, stops: null, reward: null,
+  });
   const [error, setError] = useState<string | null>(null);
   const [draftPatch, setDraftPatch] = useState<Partial<HuntDraft> | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     taRef.current?.focus();
+    return () => abortRef.current?.abort();
   }, []);
+
+  const fillFromFallback = () => {
+    LINE_ORDER.forEach((id, i) => {
+      setTimeout(
+        () => setLineMap((prev) => ({ ...prev, [id]: LOCAL_FALLBACK[id] })),
+        300 + i * 320,
+      );
+    });
+    setTimeout(() => setPhase('done'), 300 + LINE_ORDER.length * 320 + 80);
+  };
 
   const generate = async () => {
     if (!prompt.trim() || phase === 'thinking') return;
     setPhase('thinking');
-    setRevealed([]);
     setError(null);
     setDraftPatch(null);
+    setLineMap({
+      occasion: null, city: null, theme: null, shape: null, stops: null, reward: null,
+    });
+
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
 
     try {
       const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
@@ -57,39 +92,66 @@ export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ prompt: prompt.trim() }),
+        signal: controller.signal,
       });
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         throw new Error(`draft failed: ${res.status}`);
       }
-      const data = (await res.json()) as { lines: DraftLine[]; patch: Partial<HuntDraft> };
-      const incoming = Array.isArray(data.lines) && data.lines.length === 6 ? data.lines : LOCAL_FALLBACK;
-      setLines(incoming);
-      setDraftPatch(data.patch ?? null);
-      // Stream the reveal client-side for the feel even though the AI
-      // response arrives all at once.
-      incoming.forEach((l, i) => {
-        setTimeout(() => setRevealed((r) => [...r, l.id]), 320 + i * 360);
-      });
-      setTimeout(() => setPhase('done'), 320 + incoming.length * 360 + 100);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE: each event is separated by a blank line (\n\n).
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+        for (const block of parts) {
+          if (!block.trim()) continue;
+          const eventLine = block.split('\n').find((l) => l.startsWith('event:'));
+          const dataLine = block.split('\n').find((l) => l.startsWith('data:'));
+          if (!eventLine || !dataLine) continue;
+          const eventName = eventLine.slice('event:'.length).trim();
+          let data: unknown;
+          try {
+            data = JSON.parse(dataLine.slice('data:'.length).trim());
+          } catch {
+            continue;
+          }
+
+          if (eventName === 'line') {
+            const ln = data as DraftLine;
+            setLineMap((prev) => ({ ...prev, [ln.id]: ln.value }));
+          } else if (eventName === 'done') {
+            const d = data as { patch: Partial<HuntDraft> };
+            setDraftPatch(d.patch);
+            setPhase('done');
+          } else if (eventName === 'error') {
+            const e = data as { message: string };
+            setError(e.message + ' (using local sample)');
+            fillFromFallback();
+          }
+        }
+      }
     } catch (e) {
-      // Soft-fall back to the canned draft so the screen still moves. The
-      // user can hit "Try another prompt" to retry.
-      setLines(LOCAL_FALLBACK);
-      LOCAL_FALLBACK.forEach((l, i) => {
-        setTimeout(() => setRevealed((r) => [...r, l.id]), 320 + i * 360);
-      });
-      setTimeout(() => {
-        setPhase('done');
-        setError((e as Error).message + ' (using local sample)');
-      }, 320 + LOCAL_FALLBACK.length * 360 + 100);
+      if ((e as Error).name === 'AbortError') return;
+      setError((e as Error).message + ' (using local sample)');
+      fillFromFallback();
     }
   };
 
   const tryAnother = () => {
+    abortRef.current?.abort();
     setPhase('idle');
-    setRevealed([]);
     setError(null);
     setDraftPatch(null);
+    setLineMap({
+      occasion: null, city: null, theme: null, shape: null, stops: null, reward: null,
+    });
   };
 
   const applyDraft = () => {
@@ -389,11 +451,12 @@ export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {lines.map((l) => {
-                  const shown = revealed.includes(l.id);
+                {LINE_ORDER.map((id) => {
+                  const value = lineMap[id];
+                  const shown = value !== null;
                   return (
                     <div
-                      key={l.id}
+                      key={id}
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '120px 1fr',
@@ -404,7 +467,7 @@ export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
                         transition: 'opacity 320ms, transform 320ms',
                       }}
                     >
-                      <div className="label">{l.label}</div>
+                      <div className="label">{LINE_LABELS[id]}</div>
                       <div
                         className="serif"
                         style={{
@@ -415,7 +478,7 @@ export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
                         }}
                       >
                         {shown ? (
-                          l.value
+                          value
                         ) : (
                           <span
                             style={{
