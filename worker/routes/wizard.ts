@@ -261,6 +261,29 @@ wizard.post('/draft', async (c) => {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
 
+  // Guard against double-writes / double-close on stream errors. Once the
+  // client disconnects, writer.write() throws; if we tried to push an
+  // `error` event after that and then close, we'd cascade exceptions out
+  // of waitUntil as unhandled rejections.
+  let writerClosed = false;
+  const safeWrite = async (chunk: Uint8Array): Promise<void> => {
+    if (writerClosed) return;
+    try {
+      await writer.write(chunk);
+    } catch {
+      writerClosed = true;
+    }
+  };
+  const safeClose = async (): Promise<void> => {
+    if (writerClosed) return;
+    writerClosed = true;
+    try {
+      await writer.close();
+    } catch {
+      /* swallow — already errored */
+    }
+  };
+
   // Spawn the producer. We DON'T await it — we return the readable side
   // immediately so the client can start reading.
   c.executionCtx.waitUntil(
@@ -278,21 +301,24 @@ wizard.post('/draft', async (c) => {
         });
 
         for await (const event of stream) {
+          if (writerClosed) break;
           if (
             event.type === 'content_block_delta' &&
             event.delta.type === 'input_json_delta'
           ) {
             partial += event.delta.partial_json;
             for (const line of extractCompletedLines(partial, emitted)) {
-              await writer.write(sseEvent('line', line));
+              await safeWrite(sseEvent('line', line));
             }
           }
         }
 
+        if (writerClosed) return;
+
         const finalMessage = await stream.finalMessage();
         const toolUse = finalMessage.content.find((b) => b.type === 'tool_use');
         if (!toolUse || toolUse.type !== 'tool_use') {
-          await writer.write(
+          await safeWrite(
             sseEvent('error', {
               code: 'no_tool_use',
               message: 'model did not call the tool',
@@ -302,7 +328,7 @@ wizard.post('/draft', async (c) => {
         }
         const parsed = DraftResponse.safeParse(toolUse.input);
         if (!parsed.success) {
-          await writer.write(
+          await safeWrite(
             sseEvent('error', {
               code: 'ai_malformed',
               message: parsed.error.issues
@@ -317,19 +343,19 @@ wizard.post('/draft', async (c) => {
         for (const ln of parsed.data.lines) {
           if (!emitted.has(ln.id)) {
             emitted.add(ln.id);
-            await writer.write(sseEvent('line', ln));
+            await safeWrite(sseEvent('line', ln));
           }
         }
-        await writer.write(sseEvent('done', { patch: parsed.data.patch }));
+        await safeWrite(sseEvent('done', { patch: parsed.data.patch }));
       } catch (err) {
-        await writer.write(
+        await safeWrite(
           sseEvent('error', {
             code: 'ai_upstream',
             message: (err as Error).message,
           }),
         );
       } finally {
-        await writer.close();
+        await safeClose();
       }
     })(),
   );

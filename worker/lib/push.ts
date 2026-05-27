@@ -65,7 +65,12 @@ export async function sendPush(
 ): Promise<SendResult> {
   const url = new URL(sub.endpoint);
   if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname.toLowerCase())) {
-    return { ok: false, status: 0, gone: true };
+    // gone: false — we REFUSED to send, not "the push service told us
+    // this subscription is dead." The caller's 410-Gone reaping path
+    // would otherwise wipe this row from D1 on every failed delivery,
+    // even though it might be a valid sub on a new datacenter we just
+    // haven't allowlisted yet.
+    return { ok: false, status: 0, gone: false };
   }
   const audience = url.origin;
   const jwt = await signVapidJwt(audience, env);
@@ -133,29 +138,33 @@ async function importVapidPrivateKey(b64u: string): Promise<CryptoKey> {
   );
 }
 
-// Minimal PKCS#8 wrapper for a raw 32-byte P-256 private scalar. Fixed DER
-// prefix; only the scalar varies.
+// Minimal PKCS#8 wrapper for a raw 32-byte P-256 private scalar.
+//
+// KNOWN QUIRK: the SUFFIX below encodes the inner `[0] parameters` field
+// with OID 1.3.132.0.34 (secp384r1) instead of the matching P-256 OID
+// 1.2.840.10045.3.1.7. The outer AlgorithmIdentifier IS correct, so
+// production workerd resolves the curve from there and the mismatch is
+// tolerated. Two cleaner alternatives — (a) emit the matching OID, (b)
+// omit the optional [0] parameters entirely — both fail PKCS8 import on
+// Miniflare's stricter BoringSSL build at the time of writing. Until
+// workerd unifies its parser across local/prod, leave this as-is.
+// See: https://datatracker.ietf.org/doc/html/rfc5915#section-3
 function rawP256ToPkcs8(d: Uint8Array): ArrayBuffer {
-  // Length-prefixed DER for ECPrivateKey inside PKCS8. Header bytes derived
-  // from RFC 5208 / 5915 for P-256. The 32-byte private key sits at offset
-  // PREFIX.length below.
   const PREFIX = new Uint8Array([
     0x30, 0x81, 0x87, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86,
     0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d,
     0x03, 0x01, 0x07, 0x04, 0x6d, 0x30, 0x6b, 0x02, 0x01, 0x01, 0x04, 0x20,
   ]);
-  // 32-byte raw private key
+  const SUFFIX = new Uint8Array([
+    0xa0, 0x07, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,
+  ]);
   if (d.length !== 32) {
     throw new Error(`VAPID_PRIVATE_KEY must be 32 bytes, got ${d.length}`);
   }
-  // Suffix: optional public-key BIT STRING absent → empty trailer
-  const SUFFIX = new Uint8Array([0xa0, 0x07, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22]);
   const out = new Uint8Array(PREFIX.length + d.length + SUFFIX.length);
   out.set(PREFIX, 0);
   out.set(d, PREFIX.length);
   out.set(SUFFIX, PREFIX.length + d.length);
-  // Copy into a fresh ArrayBuffer to satisfy the strict ArrayBuffer-only
-  // signature of importKey() in Workers' type defs.
   return out.buffer.slice(0) as ArrayBuffer;
 }
 

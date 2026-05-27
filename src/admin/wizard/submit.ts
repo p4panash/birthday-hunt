@@ -58,23 +58,17 @@ export interface CreateHuntInput {
 }
 
 export function draftToHuntConfig(draft: HuntDraft): { input: CreateHuntInput } {
-  // Truncate to exactly 3 stops to satisfy the tuple schema.
-  const trio = draft.stops.slice(0, 3);
-  while (trio.length < 3) {
-    // Pad with a placeholder so we still satisfy the tuple. The user is
-    // expected to come back through the wizard if they don't have 3 stops
-    // yet; this fallback just prevents createHunt from 400-ing.
-    trio.push({
-      id: 'placeholder-' + trio.length,
-      x: 500,
-      y: 350,
-      name: 'Set this stop',
-      type: 'TBD',
-      time: '20m',
-      blurb: 'Update via the admin detail screen.',
-      tag: '',
-    });
+  // The HuntConfig schema's `checkpoints` is a 3-tuple — exactly three
+  // stops. The wizard supports more, but for v1 we truncate. Refuse rather
+  // than silently pad: a hunt with placeholder stops would have broken GPS
+  // checkpoints and there's no way for a player to recover.
+  if (draft.stops.length < 3) {
+    throw new Error(
+      `Need at least 3 stops to publish (you have ${draft.stops.length}). ` +
+        'Add more in Step 05 — Pick the stops.',
+    );
   }
+  const trio = draft.stops.slice(0, 3);
   const checkpoints: [Checkpoint, Checkpoint, Checkpoint] = [
     stopToCheckpoint(trio[0], draft, 1),
     stopToCheckpoint(trio[1], draft, 2),
