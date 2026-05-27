@@ -18,9 +18,19 @@ interface Props {
   state: HuntState;
   dispatch: React.Dispatch<HuntAction>;
   sliceUrls: [string, string, string] | null;
+  /**
+   * Optional content rendered inside LocationActive between WarmthPulse and
+   * the StuckSheet button. Used by team mode to mount the mini-map.
+   */
+  locationMapSlot?: React.ReactNode;
 }
 
-export default function GameShell({ state, dispatch, sliceUrls }: Props) {
+export default function GameShell({
+  state,
+  dispatch,
+  sliceUrls,
+  locationMapSlot,
+}: Props) {
   const showChrome =
     state.step.kind !== 'intro' && state.step.kind !== 'gps-preface';
   const currentN = currentCheckpoint(state);
@@ -38,7 +48,12 @@ export default function GameShell({ state, dispatch, sliceUrls }: Props) {
             revealingN={revealingN}
           />
         )}
-        <Router state={state} dispatch={dispatch} sliceUrls={sliceUrls} />
+        <Router
+          state={state}
+          dispatch={dispatch}
+          sliceUrls={sliceUrls}
+          locationMapSlot={locationMapSlot}
+        />
         {state.testMode && (
           <TestModeBadge dispatch={dispatch} currentN={currentN} />
         )}
@@ -59,7 +74,7 @@ function currentCheckpoint(state: HuntState): CheckpointIndex | null {
   }
 }
 
-function Router({ state, dispatch, sliceUrls }: Props) {
+function Router({ state, dispatch, sliceUrls, locationMapSlot }: Props) {
   const { step } = state;
   switch (step.kind) {
     case 'intro':
@@ -72,6 +87,7 @@ function Router({ state, dispatch, sliceUrls }: Props) {
           dispatch={dispatch}
           n={step.n}
           testMode={state.testMode}
+          mapSlot={locationMapSlot}
         />
       );
     case 'reveal':

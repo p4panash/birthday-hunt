@@ -42,6 +42,13 @@ interface Attachment {
   playerId: string;
   name: string;
   connectedAt: number;
+  // Optional GPS coords, updated via `presence_position` envelopes. Stored
+  // on the WS attachment so they survive across DO hibernation cycles for
+  // the lifetime of the socket.
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  last_gps_at?: number;
 }
 
 export class TeamSession extends DurableObject<Env> {
@@ -263,6 +270,16 @@ export class TeamSession extends DurableObject<Env> {
       this.handleReactSend(ws, parsed.emoji);
       return;
     }
+
+    if (parsed.type === 'ping_send') {
+      this.handlePingSend(ws, parsed.lat, parsed.lng);
+      return;
+    }
+
+    if (parsed.type === 'presence_position') {
+      this.handlePresencePosition(ws, parsed.lat, parsed.lng, parsed.accuracy);
+      return;
+    }
   }
 
   // ── Chat handler ──────────────────────────────────────────────────
@@ -380,6 +397,61 @@ export class TeamSession extends DurableObject<Env> {
     });
   }
 
+  // ── Ping handler (ephemeral, no D1) ───────────────────────────────
+
+  private pingSeq = 0;
+  private static readonly PING_TTL_MS = 5_000;
+
+  private handlePingSend(ws: WebSocket, lat: number, lng: number): void {
+    const att = this.attachmentFor(ws);
+    if (!att) {
+      ws.send(stringify({
+        v: 1, type: 'error', code: 'not_attached',
+        message: 'socket has no player attachment',
+      }));
+      return;
+    }
+    const limit = this.rateLimiter.check('ping', att.playerId);
+    if (!limit.ok) {
+      ws.send(stringify({
+        v: 1, type: 'error', code: 'rate_limited',
+        message: 'too many pings, slow down',
+        retry_after_ms: limit.retry_after_ms,
+      }));
+      return;
+    }
+    const now = Date.now();
+    const id = `pg${now.toString(36)}${(++this.pingSeq).toString(36)}`;
+    this.broadcast({
+      v: 1,
+      type: 'ping_show',
+      lat, lng,
+      sender_id: att.playerId,
+      sender_name: att.name,
+      id,
+      expires_at: now + TeamSession.PING_TTL_MS,
+    });
+  }
+
+  // ── Presence position update ──────────────────────────────────────
+
+  private handlePresencePosition(
+    ws: WebSocket,
+    lat: number,
+    lng: number,
+    accuracy?: number,
+  ): void {
+    const att = this.attachmentFor(ws);
+    if (!att) return; // silent — position updates are best-effort
+    const next: Attachment = {
+      ...att,
+      lat, lng, accuracy,
+      last_gps_at: Date.now(),
+    };
+    ws.serializeAttachment(next);
+    this.broadcastPresence();
+  }
+
   private attachmentFor(ws: WebSocket): Attachment | null {
     try {
       return (ws.deserializeAttachment() as Attachment | null) ?? null;
@@ -417,6 +489,10 @@ export class TeamSession extends DurableObject<Env> {
             playerId: att.playerId,
             name: att.name,
             connectedAt: att.connectedAt,
+            lat: att.lat,
+            lng: att.lng,
+            accuracy: att.accuracy,
+            last_gps_at: att.last_gps_at,
           });
         }
       } catch {

@@ -5,18 +5,24 @@
 // when the WebSocket is disconnected). It's intentionally tiny so it doesn't
 // fight the existing v1 UI for attention.
 //
-// Social bundle (P1): adds a chat drawer accessed via a fab on the ribbon.
+// Social bundle (P1-P3): chat drawer, floating reactions, mini-map with
+// pings. The map only mounts during the active LocationActive step.
 
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useQrSlices } from './lib/useQrSlices';
 import { detectTestMode } from './lib/testMode';
 import { useTeamState } from './lib/useTeamState';
 import type { TeamSession } from './lib/teamSession';
+import { tierFromDistance, useGeoWatch } from './geo/useGeoWatch';
 import GameShell from './GameShell';
 import PresenceRibbon from './components/PresenceRibbon';
 import ChatDrawer from './components/ChatDrawer';
 import ReactionTray from './components/ReactionTray';
 import FloatingReactionLayer from './components/FloatingReactionLayer';
+import { config } from './config';
+
+// Leaflet weighs ~38KB gz; keep it out of the initial bundle.
+const TeamMap = lazy(() => import('./components/TeamMap'));
 
 const QR_SRC = `${import.meta.env.BASE_URL}qr.jpg`;
 
@@ -36,6 +42,9 @@ export default function TeamMode({ session }: Props) {
     sendChat,
     reactions,
     sendReaction,
+    pings,
+    sendPing,
+    publishPosition,
   } = useTeamState({
     teamId: session.team_id,
     playerId: session.player_id,
@@ -43,18 +52,29 @@ export default function TeamMode({ session }: Props) {
   });
   const sliceUrls = useQrSlices(QR_SRC);
 
-  // Chat drawer + unread counter. The counter increments whenever a new
-  // chat_new arrives while the drawer is closed and the sender isn't us;
-  // resets on drawer open. The chatSnapshotRev cursor is bumped by
-  // useTeamState on every (re)connect so we can treat the snapshot's
-  // entire history as "already seen" and not inflate the badge on
-  // reconnects.
+  // Local GPS — only watch when the active step needs it. The hook needs a
+  // target to compute distance against; we use the current checkpoint's
+  // coords when state.step.kind === 'location', null otherwise.
+  const activeCheckpoint =
+    state.step.kind === 'location' ? config.checkpoints[state.step.n] : null;
+  const geo = useGeoWatch(
+    activeCheckpoint
+      ? { lat: activeCheckpoint.lat, lng: activeCheckpoint.lng }
+      : null,
+  );
+
+  // Publish position to teammates whenever we get a fix.
+  useEffect(() => {
+    if (geo.lat == null || geo.lng == null) return;
+    publishPosition(geo.lat, geo.lng, geo.accuracyMeters ?? undefined);
+  }, [geo.lat, geo.lng, geo.accuracyMeters, publishPosition]);
+
+  // Chat drawer + unread counter (same as before).
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const lastSeenIdRef = useRef<number>(0);
   const lastSnapshotRevRef = useRef<number>(chatSnapshotRev);
 
-  // When a snapshot arrives, treat its full payload as seen.
   useEffect(() => {
     if (chatSnapshotRev === lastSnapshotRevRef.current) return;
     lastSnapshotRevRef.current = chatSnapshotRev;
@@ -74,7 +94,6 @@ export default function TeamMode({ session }: Props) {
       setUnread(0);
       return;
     }
-    // Count messages newer than lastSeen that weren't sent by us.
     const incoming = chat.filter(
       (m) => m.id > lastSeenIdRef.current && m.player_id !== session.player_id,
     );
@@ -100,9 +119,31 @@ export default function TeamMode({ session }: Props) {
     );
   }
 
+  // Render the map only when there's an active checkpoint to anchor against.
+  const tier = tierFromDistance(geo.distanceMeters);
+  const mapSlot = activeCheckpoint ? (
+    <Suspense fallback={null}>
+      <TeamMap
+        selfPlayerId={session.player_id}
+        selfLat={geo.lat}
+        selfLng={geo.lng}
+        presence={presence}
+        pings={pings}
+        checkpoint={{ lat: activeCheckpoint.lat, lng: activeCheckpoint.lng }}
+        showCheckpoint={tier === 'onTop'}
+        onMapTap={sendPing}
+      />
+    </Suspense>
+  ) : null;
+
   return (
     <>
-      <GameShell state={state} dispatch={dispatch} sliceUrls={sliceUrls} />
+      <GameShell
+        state={state}
+        dispatch={dispatch}
+        sliceUrls={sliceUrls}
+        locationMapSlot={mapSlot}
+      />
       <PresenceRibbon
         presence={presence}
         connected={connected}

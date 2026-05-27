@@ -4,7 +4,12 @@
 // so they can be filtered as features come online.
 
 import { expect, test } from '@playwright/test';
-import { clearTeamSession, joinAs, seedHuntAndTeam } from './helpers';
+import {
+  adminAction,
+  clearTeamSession,
+  joinAs,
+  seedHuntAndTeam,
+} from './helpers';
 
 test.describe('Social bundle — chat (P1)', () => {
   test('two players see each other\'s messages within 2s', async ({
@@ -117,6 +122,74 @@ test.describe('Social bundle — reactions (P2)', () => {
     await page.goto('/');
     await expect(page.locator('.eyebrow')).toBeVisible({ timeout: 10_000 });
     expect(await page.getByTestId('reaction-tray').count()).toBe(0);
+  });
+});
+
+test.describe('Social bundle — map + pings (P3)', () => {
+  test.use({
+    geolocation: { latitude: 44.41, longitude: 26.11 },
+    permissions: ['geolocation'],
+  });
+
+  test('player tap on map broadcasts a ping to teammate', async ({
+    browser,
+    request,
+  }) => {
+    const seed = await seedHuntAndTeam(request);
+
+    const ctxA = await browser.newContext({
+      geolocation: { latitude: 44.41, longitude: 26.11 },
+      permissions: ['geolocation'],
+    });
+    const ctxB = await browser.newContext({
+      geolocation: { latitude: 44.41, longitude: 26.11 },
+      permissions: ['geolocation'],
+    });
+    const pageA = await ctxA.newPage();
+    const pageB = await ctxB.newPage();
+    try {
+      await joinAs(pageA, seed.inviteCode, 'andi');
+      await joinAs(pageB, seed.inviteCode, 'maria');
+
+      // Admin jumps the team to location 1 so the map mounts.
+      await adminAction(request, seed.huntId, seed.teamId, {
+        type: 'JUMP_TO_STEP',
+        step: { kind: 'location', n: 0 },
+      });
+
+      // Both players see the team-map container.
+      await expect(pageA.getByTestId('team-map')).toBeVisible({
+        timeout: 5_000,
+      });
+      await expect(pageB.getByTestId('team-map')).toBeVisible({
+        timeout: 5_000,
+      });
+
+      // A taps the center of the map → local echo + WS broadcast.
+      const aMap = pageA.getByTestId('team-map');
+      const aBox = await aMap.boundingBox();
+      expect(aBox).toBeTruthy();
+      // Click slightly off-center to avoid hitting a marker on top of self.
+      await pageA.mouse.click(
+        aBox!.x + aBox!.width * 0.7,
+        aBox!.y + aBox!.height * 0.3,
+      );
+
+      // B should see a ping marker (yellow pulse) appear on its map.
+      await expect(
+        pageB.locator('.bday-ping-marker').first(),
+      ).toBeVisible({ timeout: 3_000 });
+    } finally {
+      await ctxA.close();
+      await ctxB.close();
+    }
+  });
+
+  test('solo mode has no team-map', async ({ page }) => {
+    await clearTeamSession(page);
+    await page.goto('/');
+    await expect(page.locator('.eyebrow')).toBeVisible({ timeout: 10_000 });
+    expect(await page.getByTestId('team-map').count()).toBe(0);
   });
 });
 

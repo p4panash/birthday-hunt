@@ -59,6 +59,18 @@ export interface UseTeamStateResult {
    * after their 2-second TTL. Each render passes these to FloatingReactionLayer.
    */
   reactions: FloatingReaction[];
+  /**
+   * Active map pings, garbage-collected after their 5-second TTL.
+   */
+  pings: ActivePing[];
+  /** Drop a map ping at (lat, lng). */
+  sendPing: (lat: number, lng: number) => void;
+  /**
+   * Broadcast our own GPS position to teammates. Called by the team shell
+   * whenever the local geo watcher emits a new fix; throttled internally
+   * to ≤1 update per 2 seconds.
+   */
+  publishPosition: (lat: number, lng: number, accuracy?: number) => void;
 }
 
 export interface FloatingReaction {
@@ -69,7 +81,17 @@ export interface FloatingReaction {
   expires_at: number;
 }
 
+export interface ActivePing {
+  id: string;
+  lat: number;
+  lng: number;
+  sender_id: string;
+  sender_name: string;
+  expires_at: number;
+}
+
 const REACTION_TTL_MS = 2_000;
+const POSITION_MIN_GAP_MS = 2_000;
 
 export function useTeamState(args: {
   teamId: string;
@@ -86,6 +108,8 @@ export function useTeamState(args: {
   const [chatSnapshotRev, setChatSnapshotRev] = useState(0);
   const [chatWiped, setChatWiped] = useState(false);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  const [pings, setPings] = useState<ActivePing[]>([]);
+  const lastPositionAtRef = useRef<number>(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -130,25 +154,42 @@ export function useTeamState(args: {
           setChatWiped(true);
           setTimeout(() => setChatWiped(false), 1000);
         } else if (parsed.type === 'react_show') {
-          // Idempotent on id — local-echo + server broadcast send the same
-          // reaction; dedupe by id so we don't double-render the sender's
-          // own emoji.
-          setReactions((prev) =>
-            prev.some((r) => r.id === parsed.id)
-              ? prev
-              : [
-                  ...prev,
-                  {
-                    id: parsed.id,
-                    emoji: parsed.emoji,
-                    sender_id: parsed.sender_id,
-                    sender_name: parsed.sender_name,
-                    expires_at: Date.now() + REACTION_TTL_MS,
-                  },
-                ],
-          );
+          // Server reactions never collide with local-echo ids (different
+          // prefixes), so unconditional append is safe. The own-reaction's
+          // server broadcast IS rendered alongside the local echo because
+          // they share emoji but render at different jitter positions —
+          // visually one tap = one emoji on sender's screen because the
+          // local echo lifetime (2s) covers any RTT.
+          if (parsed.sender_id === playerId) {
+            // Suppress server echo of our own reaction to avoid double-render.
+            return;
+          }
+          setReactions((prev) => [
+            ...prev,
+            {
+              id: parsed.id,
+              emoji: parsed.emoji,
+              sender_id: parsed.sender_id,
+              sender_name: parsed.sender_name,
+              expires_at: Date.now() + REACTION_TTL_MS,
+            },
+          ]);
+        } else if (parsed.type === 'ping_show') {
+          // Same dedup logic: suppress our own echo from the server.
+          if (parsed.sender_id === playerId) return;
+          setPings((prev) => [
+            ...prev,
+            {
+              id: parsed.id,
+              lat: parsed.lat,
+              lng: parsed.lng,
+              sender_id: parsed.sender_id,
+              sender_name: parsed.sender_name,
+              expires_at: parsed.expires_at,
+            },
+          ]);
         }
-        // ping_show / pong / error: wired in later phases
+        // pong / error: ignored client-side (logged via DevTools if needed)
       });
 
       ws.addEventListener('close', () => {
@@ -185,6 +226,7 @@ export function useTeamState(args: {
         }
       }
     };
+    // The handler refs playerId for own-echo dedup; teamId for the URL.
   }, [teamId, playerId]);
 
   const dispatch = useCallback((action: HuntAction) => {
@@ -205,13 +247,16 @@ export function useTeamState(args: {
     ws.send(JSON.stringify({ v: 1, type: 'chat_send', body: trimmed }));
   }, []);
 
-  // GC stale reactions every 250ms. Cheap; reactions max out at ~120/min
-  // under the rate-limit cap.
+  // GC stale reactions + pings every 250ms.
   useEffect(() => {
     const handle = setInterval(() => {
       const now = Date.now();
       setReactions((prev) => {
         const next = prev.filter((r) => r.expires_at > now);
+        return next.length === prev.length ? prev : next;
+      });
+      setPings((prev) => {
+        const next = prev.filter((p) => p.expires_at > now);
         return next.length === prev.length ? prev : next;
       });
     }, 250);
@@ -244,6 +289,49 @@ export function useTeamState(args: {
     [playerId],
   );
 
+  const sendPing = useCallback(
+    (lat: number, lng: number) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      // Local echo. Same dedup rationale as reactions: own pings render
+      // immediately and the server broadcast for our own send is dropped.
+      const localId = `local-pg-${Date.now().toString(36)}`;
+      setPings((prev) => [
+        ...prev,
+        {
+          id: localId,
+          lat,
+          lng,
+          sender_id: playerId,
+          sender_name: '',
+          expires_at: Date.now() + 5_000,
+        },
+      ]);
+      ws.send(JSON.stringify({ v: 1, type: 'ping_send', lat, lng }));
+    },
+    [playerId],
+  );
+
+  const publishPosition = useCallback(
+    (lat: number, lng: number, accuracy?: number) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const now = Date.now();
+      if (now - lastPositionAtRef.current < POSITION_MIN_GAP_MS) return;
+      lastPositionAtRef.current = now;
+      ws.send(
+        JSON.stringify({
+          v: 1,
+          type: 'presence_position',
+          lat,
+          lng,
+          accuracy,
+        }),
+      );
+    },
+    [],
+  );
+
   const state = useMemo<HuntState>(
     () => ({ ...serverState, testMode: localTestMode }),
     [serverState, localTestMode],
@@ -261,5 +349,8 @@ export function useTeamState(args: {
     sendChat,
     sendReaction,
     reactions,
+    pings,
+    sendPing,
+    publishPosition,
   };
 }

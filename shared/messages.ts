@@ -33,6 +33,13 @@ export const PlayerPresenceSchema = z.object({
   playerId: z.string(),
   name: z.string(),
   connectedAt: z.number(),
+  // Optional GPS coords. Sent by the client via `presence_position`; the DO
+  // copies them into the WS attachment and includes them in every presence
+  // frame. Old clients that don't send positions simply omit these fields.
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  accuracy: z.number().optional(),
+  last_gps_at: z.number().optional(),
 });
 
 export const ClientMsgSchema = z.discriminatedUnion('type', [
@@ -53,6 +60,13 @@ export const ClientMsgSchema = z.discriminatedUnion('type', [
     type: z.literal('ping_send'),
     lat: z.number(),
     lng: z.number(),
+  }),
+  z.object({
+    v: V,
+    type: z.literal('presence_position'),
+    lat: z.number(),
+    lng: z.number(),
+    accuracy: z.number().optional(),
   }),
 ]);
 
