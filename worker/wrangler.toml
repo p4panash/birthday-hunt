@@ -9,6 +9,19 @@ name = "birthday-hunt"
 main = "index.ts"
 compatibility_date = "2025-12-01"
 
+# Disable the free birthday-hunt.<account>.workers.dev URL. Production traffic
+# routes through hunt.use-adonis.com (Worker route on the zone below), so the
+# public workers.dev URL is an unprotected backdoor. Setting this to false
+# revokes the subdomain on the next `wrangler deploy`; until then any existing
+# workers.dev route stays live. wrangler dev keeps working locally regardless.
+workers_dev = false
+
+# Production route. Traffic to hunt.use-adonis.com/api/* hits the birthday-hunt
+# worker; everything else on that hostname falls through to Cloudflare Pages.
+[[routes]]
+pattern = "hunt.use-adonis.com/api/*"
+zone_name = "use-adonis.com"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "birthday-hunt-db"

@@ -144,6 +144,64 @@ describe('POST /api/teams/join', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  // Spec § resolved-decision #8: max 10 players per team. The 11th distinct
+  // client_id should be refused.
+  it('rejects the 11th distinct player on a team (max 10)', async () => {
+    const { inviteCode } = await seedHuntAndTeam();
+    // Seed 10 successful joins with distinct client_ids.
+    for (let i = 0; i < 10; i++) {
+      const r = await SELF.fetch('http://localhost/api/teams/join', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invite_code: inviteCode,
+          player_name: `p${i}`,
+          client_id: `client-${'a'.repeat(8)}-${i.toString().padStart(2, '0')}`,
+        }),
+      });
+      expect(r.status, `player ${i + 1} should join`).toBe(200);
+    }
+    // 11th distinct client should be rejected.
+    const reject = await SELF.fetch('http://localhost/api/teams/join', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        invite_code: inviteCode,
+        player_name: 'overflow',
+        client_id: 'client-overflow-11',
+      }),
+    });
+    expect(reject.status).toBe(403);
+    const body = await reject.json<{ error: { code: string } }>();
+    expect(body.error.code).toBe('team_full');
+  });
+
+  it('re-binding an existing player on a full team still succeeds', async () => {
+    const { inviteCode } = await seedHuntAndTeam();
+    // Fill the team.
+    const firstClientId = `client-first-${'a'.repeat(12)}`;
+    for (let i = 0; i < 10; i++) {
+      const r = await SELF.fetch('http://localhost/api/teams/join', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invite_code: inviteCode,
+          player_name: `p${i}`,
+          client_id: i === 0 ? firstClientId : `client-other-${i}-${'a'.repeat(8)}`,
+        }),
+      });
+      expect(r.status).toBe(200);
+    }
+    // Re-join with the same client_id as player 0 — should NOT count as a new
+    // slot, so this must succeed.
+    const rebind = await SELF.fetch('http://localhost/api/teams/join', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        invite_code: inviteCode,
+        player_name: 'p0-renamed',
+        client_id: firstClientId,
+      }),
+    });
+    expect(rebind.status).toBe(200);
+  });
 });
 
 describe('GET /api/teams/:id', () => {

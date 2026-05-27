@@ -6,14 +6,19 @@ import { Hono } from 'hono';
 import {
   getHunt,
   getPlayer,
+  getPlayerByClientId,
   getTeam,
   getTeamByInviteCode,
   getTeamState,
+  listPlayersByTeam,
   upsertPlayer,
 } from '../db/queries';
 import { nanoid } from '../lib/id';
 import { JoinTeamRequestSchema } from '../lib/validators';
 import type { Env } from '../index';
+
+/** Per spec § resolved-decision #8 — caps concurrent players on a team. */
+const MAX_PLAYERS_PER_TEAM = 10;
 
 const teams = new Hono<{ Bindings: Env }>();
 
@@ -35,6 +40,35 @@ teams.post('/join', async (c) => {
       { error: { code: 'orphan_team', message: 'hunt missing for team' } },
       500,
     );
+  }
+
+  // Enforce the team-size cap BEFORE upserting. Re-binding an existing player
+  // (same client_id) does not consume a new slot, so check that first.
+  //
+  // Known race: the read-then-write between the count and upsertPlayer is not
+  // atomic. Two simultaneous new-player requests at count==9 could both pass
+  // the check and land 11 rows. D1 has no SELECT...FOR UPDATE; the proper fix
+  // is either an atomic conditional INSERT or routing through TeamSession DO
+  // (which serialises mutations per team). At ≤10 friends joining a birthday
+  // hunt, the probability of a race is vanishing — accepted risk for v1.
+  const existing = await getPlayerByClientId(
+    c.env.DB,
+    team.id,
+    body.client_id,
+  );
+  if (!existing) {
+    const current = await listPlayersByTeam(c.env.DB, team.id);
+    if (current.length >= MAX_PLAYERS_PER_TEAM) {
+      return c.json(
+        {
+          error: {
+            code: 'team_full',
+            message: `team is full (max ${MAX_PLAYERS_PER_TEAM} players)`,
+          },
+        },
+        403,
+      );
+    }
   }
 
   const player = await upsertPlayer(c.env.DB, {
