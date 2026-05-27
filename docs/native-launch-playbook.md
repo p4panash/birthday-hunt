@@ -238,8 +238,11 @@ Apple privacy questionnaire — match these to `public/privacy.html`:
 
 Play Console Data Safety: same answers.
 
-Privacy policy URL (both stores): `https://hunt.use-adonis.com/privacy.html`.
-Terms URL: `https://hunt.use-adonis.com/terms.html`.
+Privacy policy URL (both stores): `https://hunt.use-adonis.com/privacy`.
+Terms URL: `https://hunt.use-adonis.com/terms`.
+
+(Cloudflare Pages serves these from `public/privacy.html` and
+`public/terms.html`; both extension-less URLs return 200.)
 
 ### C7. Submit
 
