@@ -402,6 +402,13 @@ export async function upsertPushSubscription(
   return row;
 }
 
+/**
+ * Server-side cleanup: drops a subscription by its endpoint regardless of
+ * owner. Reserved for the DO's reaping path after a push service returns
+ * 404/410-Gone. NEVER call this in response to user input — public unsubscribe
+ * goes through deletePushSubscriptionForPlayer() so a caller can only remove
+ * their own.
+ */
 export async function deletePushSubscriptionByEndpoint(
   db: D1Database,
   endpoint: string,
@@ -409,6 +416,25 @@ export async function deletePushSubscriptionByEndpoint(
   const r = await db
     .prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`)
     .bind(endpoint)
+    .run();
+  return r.meta?.changes ?? 0;
+}
+
+/**
+ * User-facing unsubscribe. Requires both the player_id and the endpoint, so
+ * the caller cannot remove other players' subscriptions even if they learn
+ * an endpoint URL.
+ */
+export async function deletePushSubscriptionForPlayer(
+  db: D1Database,
+  playerId: string,
+  endpoint: string,
+): Promise<number> {
+  const r = await db
+    .prepare(
+      `DELETE FROM push_subscriptions WHERE player_id = ? AND endpoint = ?`,
+    )
+    .bind(playerId, endpoint)
     .run();
   return r.meta?.changes ?? 0;
 }

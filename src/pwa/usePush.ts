@@ -7,6 +7,7 @@
 //   4. disable() unsubscribes locally and POSTs to Worker
 
 import { useCallback, useEffect, useState } from 'react';
+import { getClientId } from '../lib/clientId';
 
 export interface UsePushResult {
   supported: boolean;
@@ -112,6 +113,10 @@ export function usePush(args: {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             player_id: playerId,
+            // Sent so the server can verify we own this player identity
+            // (matches players.client_id row). Same secret that re-binds
+            // the player on rejoin.
+            client_id: getClientId(),
             endpoint: sub.endpoint,
             keys: {
               p256dh: json.keys?.p256dh ?? arrayBufferToBase64Url(sub.getKey('p256dh')),
@@ -143,6 +148,7 @@ export function usePush(args: {
         setSubscribed(false);
         return;
       }
+      // playerId is captured by closure (the outer hook arg).
       const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
       // Tell the server first; if that fails, leave the local sub in place
       // so the user can retry.
@@ -151,7 +157,11 @@ export function usePush(args: {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
+          body: JSON.stringify({
+            player_id: playerId,
+            client_id: getClientId(),
+            endpoint: sub.endpoint,
+          }),
         },
       );
       if (!res.ok) throw new Error(`unsubscribe failed: ${res.status}`);
@@ -162,7 +172,7 @@ export function usePush(args: {
     } finally {
       setBusy(false);
     }
-  }, [supported, teamId]);
+  }, [supported, teamId, playerId]);
 
   return { supported, permission, subscribed, busy, error, enable, disable };
 }

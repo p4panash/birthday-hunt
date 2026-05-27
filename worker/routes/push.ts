@@ -12,7 +12,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../index';
 import {
-  deletePushSubscriptionByEndpoint,
+  deletePushSubscriptionForPlayer,
   getPlayer,
   upsertPushSubscription,
 } from '../db/queries';
@@ -53,6 +53,13 @@ function isAllowedPushEndpoint(rawUrl: string): boolean {
 
 const SubscribeSchema = z.object({
   player_id: z.string().min(1),
+  // client_id is the only client-bound secret. The server stores it on
+  // `players.client_id` at join time, the browser keeps it in localStorage,
+  // and it's NEVER exposed to other teammates (presence frames carry only
+  // player_id + name). Requiring it here turns subscribe from "anyone in
+  // the team can subscribe as anyone" into "you can subscribe only as
+  // yourself" — without standing up a new session layer.
+  client_id: z.string().min(8).max(128),
   endpoint: z
     .string()
     .url()
@@ -67,6 +74,8 @@ const SubscribeSchema = z.object({
 });
 
 const UnsubscribeSchema = z.object({
+  player_id: z.string().min(1),
+  client_id: z.string().min(8).max(128),
   endpoint: z.string().url().max(1024),
 });
 
@@ -87,10 +96,15 @@ push.post('/teams/:teamId/subscribe', async (c) => {
   const teamId = c.req.param('teamId');
   const body = SubscribeSchema.parse(await c.req.json());
 
-  // Verify the player belongs to the team. Without this, anyone who knows a
-  // team_id could subscribe an arbitrary player_id (or worse, a forged one).
+  // Verify the player exists, belongs to the team, AND proves identity
+  // via client_id. Returning 404 for all three failure modes avoids
+  // leaking which axis failed (player exists? wrong team? wrong secret?).
   const player = await getPlayer(c.env.DB, body.player_id);
-  if (!player || player.team_id !== teamId) {
+  if (
+    !player ||
+    player.team_id !== teamId ||
+    player.client_id !== body.client_id
+  ) {
     return c.json(
       { error: { code: 'not_found', message: 'player not in team' } },
       404,
@@ -108,9 +122,27 @@ push.post('/teams/:teamId/subscribe', async (c) => {
 });
 
 push.post('/teams/:teamId/unsubscribe', async (c) => {
+  const teamId = c.req.param('teamId');
   const body = UnsubscribeSchema.parse(await c.req.json());
-  const wiped = await deletePushSubscriptionByEndpoint(
+
+  // Same identity proof as subscribe. The DELETE is then constrained to
+  // (endpoint, player_id) so a caller can only remove their OWN
+  // subscription — not somebody else's by guessing an endpoint URL.
+  const player = await getPlayer(c.env.DB, body.player_id);
+  if (
+    !player ||
+    player.team_id !== teamId ||
+    player.client_id !== body.client_id
+  ) {
+    return c.json(
+      { error: { code: 'not_found', message: 'player not in team' } },
+      404,
+    );
+  }
+
+  const wiped = await deletePushSubscriptionForPlayer(
     c.env.DB,
+    body.player_id,
     body.endpoint,
   );
   return c.json({ ok: true, wiped });
