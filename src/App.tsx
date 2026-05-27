@@ -11,6 +11,8 @@ import TeamMode from './TeamMode';
 import Join from './screens/Join';
 import AdminApp from './admin/AdminApp';
 import { loadTeamSession, type TeamSession } from './lib/teamSession';
+import OfflineBanner from './pwa/OfflineBanner';
+import UpdateToast from './pwa/UpdateToast';
 
 type Route = 'admin' | 'join' | 'team' | 'solo';
 
@@ -37,28 +39,32 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  // Admin SPA owns its full chrome; PWA overlays are mounted there separately
+  // if/when we want them in admin (not for v1).
   if (route === 'admin') {
     return <AdminApp />;
   }
 
-  if (route === 'join') {
-    return (
-      <Join
-        onJoined={() => {
-          const next = loadTeamSession();
-          setSession(next);
-          // Drop the /join from the URL so a reload lands in team mode.
-          const base = import.meta.env.BASE_URL || '/';
-          window.history.replaceState(null, '', base);
-          setRoute('team');
-        }}
-      />
-    );
-  }
-
-  if (route === 'team' && session) {
-    return <TeamMode session={session} />;
-  }
-
-  return <SoloMode />;
+  return (
+    <>
+      <OfflineBanner />
+      <UpdateToast />
+      {route === 'join' ? (
+        <Join
+          onJoined={() => {
+            const next = loadTeamSession();
+            setSession(next);
+            // Drop the /join from the URL so a reload lands in team mode.
+            const base = import.meta.env.BASE_URL || '/';
+            window.history.replaceState(null, '', base);
+            setRoute('team');
+          }}
+        />
+      ) : route === 'team' && session ? (
+        <TeamMode session={session} />
+      ) : (
+        <SoloMode />
+      )}
+    </>
+  );
 }
