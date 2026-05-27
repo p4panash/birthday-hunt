@@ -124,6 +124,13 @@ export function sendTeamAction(huntId: string, teamId: string, action: unknown) 
   );
 }
 
+export function wipeTeamChat(huntId: string, teamId: string) {
+  return adminFetch<{ ok: boolean; wiped: number }>(
+    `/api/admin/hunts/${encodeURIComponent(huntId)}/teams/${encodeURIComponent(teamId)}/chat/wipe`,
+    { method: 'POST' },
+  );
+}
+
 export interface AuditEntry {
   id: number;
   admin_email: string;

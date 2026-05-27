@@ -81,3 +81,67 @@ test.describe('Social bundle — chat (P1)', () => {
     expect(await page.getByTestId('chat-fab').count()).toBe(0);
   });
 });
+
+test.describe('Social bundle — admin wipe (P1.5)', () => {
+  test('admin wipe clears both players\' drawers and writes audit log', async ({
+    browser,
+    request,
+  }) => {
+    const seed = await seedHuntAndTeam(request);
+
+    const ctxA = await browser.newContext();
+    const ctxB = await browser.newContext();
+    const ctxAdmin = await browser.newContext();
+    const pageA = await ctxA.newPage();
+    const pageB = await ctxB.newPage();
+    const pageAdmin = await ctxAdmin.newPage();
+
+    try {
+      await joinAs(pageA, seed.inviteCode, 'andi');
+      await joinAs(pageB, seed.inviteCode, 'maria');
+
+      // Each sends one message.
+      await pageA.getByTestId('chat-fab').click();
+      await pageA.getByTestId('chat-input').fill('hi from andi');
+      await pageA.getByTestId('chat-send').click();
+
+      await pageB.getByTestId('chat-fab').click();
+      await pageB.getByTestId('chat-input').fill('hi from maria');
+      await pageB.getByTestId('chat-send').click();
+
+      // Both see both messages.
+      await expect(
+        pageA.getByTestId('chat-list').getByText('hi from maria'),
+      ).toBeVisible({ timeout: 3_000 });
+      await expect(
+        pageB.getByTestId('chat-list').getByText('hi from andi'),
+      ).toBeVisible({ timeout: 3_000 });
+
+      // Admin opens hunt detail and clicks "wipe chat" (with confirm).
+      await pageAdmin.goto(`/admin/hunts/${seed.huntId}`);
+      pageAdmin.once('dialog', (d) => d.accept());
+      await pageAdmin.getByTestId(`wipe-chat-${seed.teamId}`).click();
+
+      // Both player tabs see chat empty within a couple seconds.
+      const empty = 'No messages yet';
+      await expect(pageA.getByText(empty)).toBeVisible({ timeout: 3_000 });
+      await expect(pageB.getByText(empty)).toBeVisible({ timeout: 3_000 });
+
+      // Audit log endpoint shows the chat.wipe row.
+      const audit = await request.get(
+        'http://localhost:8787/api/admin/audit_log?limit=10',
+      );
+      const body = (await audit.json()) as {
+        entries: { action: string; target: string }[];
+      };
+      const wipeEntry = body.entries.find(
+        (e) => e.action === 'chat.wipe' && e.target === seed.teamId,
+      );
+      expect(wipeEntry, 'audit log entry for chat.wipe').toBeTruthy();
+    } finally {
+      await ctxA.close();
+      await ctxB.close();
+      await ctxAdmin.close();
+    }
+  });
+});

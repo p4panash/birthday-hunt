@@ -8,6 +8,7 @@ import { requireAdmin } from '../middleware/access';
 import {
   appendAuditLog,
   getHunt,
+  getTeam,
   getTeamState,
   insertHunt,
   insertTeam,
@@ -167,6 +168,56 @@ admin.patch('/hunts/:id', async (c) => {
 // ── Teams ────────────────────────────────────────────────────────────
 
 // ── Team override: admin can jump a team to a specific step ─────────
+
+// ── Team chat wipe: admin nukes a team's chat history ────────────────
+
+admin.post('/hunts/:huntId/teams/:teamId/chat/wipe', async (c) => {
+  const adminIdentity = c.get('admin');
+  const huntId = c.req.param('huntId');
+  const teamId = c.req.param('teamId');
+
+  // Verify the team exists AND belongs to the requested hunt. Without this,
+  // an admin who has the URL for hunt X could wipe a team belonging to
+  // hunt Y by guessing the team id.
+  //
+  // Authorization model: any Cloudflare Access-approved identity is
+  // currently trusted across all hunts (single-tenant Access policy). When
+  // the Access policy widens to multiple admins, add a `hunts.created_by`
+  // column and gate this endpoint on `hunt.created_by === adminIdentity.email`.
+  const team = await getTeam(c.env.DB, teamId);
+  if (!team || team.hunt_id !== huntId) {
+    return c.json(
+      { error: { code: 'not_found', message: 'team not found in hunt' } },
+      404,
+    );
+  }
+
+  // Audit first (immutable record), then mutate via the DO. The DO performs
+  // the D1 DELETE inside its input gate, serialised with any concurrent
+  // chat_send — closes the race where a player can plant a message that
+  // survives the wipe by sending mid-flight.
+  await appendAuditLog(c.env.DB, {
+    admin_email: adminIdentity.email,
+    action: 'chat.wipe',
+    target: teamId,
+    payload_json: JSON.stringify({ hunt_id: huntId }),
+  });
+
+  const doId = c.env.TEAM_SESSION.idFromName(teamId);
+  const stub = c.env.TEAM_SESSION.get(doId);
+  const doRes = await stub.fetch('http://internal/internal/chat/wipe', {
+    method: 'POST',
+  });
+  if (!doRes.ok) {
+    return c.json(
+      { error: { code: 'wipe_failed', message: 'DO refused wipe' } },
+      502,
+    );
+  }
+  const doBody = (await doRes.json()) as { ok: boolean; wiped: number };
+
+  return c.json({ ok: true, wiped: doBody.wiped });
+});
 
 admin.post('/hunts/:huntId/teams/:teamId/action', async (c) => {
   const adminIdentity = c.get('admin');

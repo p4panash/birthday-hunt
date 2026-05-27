@@ -89,6 +89,9 @@ export function useTeamState(args: {
       });
 
       ws.addEventListener('message', (event) => {
+        // Guard against StrictMode (and slow async close) double-delivery:
+        // if this socket is no longer the active one, drop the frame.
+        if (wsRef.current !== ws) return;
         if (typeof event.data !== 'string') return;
         let parsed;
         try {

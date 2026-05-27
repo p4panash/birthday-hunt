@@ -12,6 +12,7 @@ import {
   listHunts,
   patchHunt,
   sendTeamAction,
+  wipeTeamChat,
   type AuditEntry,
   type HuntSummary,
   type TeamSummary,
@@ -594,6 +595,8 @@ function TeamCard({ team }: { team: TeamSummary }) {
   const [jumpOpen, setJumpOpen] = useState(false);
   const [jumpBusy, setJumpBusy] = useState(false);
   const [jumpError, setJumpError] = useState<string | null>(null);
+  const [wipeBusy, setWipeBusy] = useState(false);
+  const [wipeStatus, setWipeStatus] = useState<string | null>(null);
   const stepLabel = team.step ?? 'intro';
   const unlocked = team.unlocked_count ?? 0;
   const roster = team.roster ?? [];
@@ -713,7 +716,46 @@ function TeamCard({ team }: { team: TeamSummary }) {
           >
             <Icon name="settings" size={11} /> jump
           </button>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px 10px', fontSize: 11 }}
+            disabled={wipeBusy}
+            data-testid={`wipe-chat-${team.id}`}
+            onClick={async () => {
+              const confirmed = window.confirm(
+                `Wipe all chat for team "${team.name}"? This cannot be undone.`,
+              );
+              if (!confirmed) return;
+              setWipeBusy(true);
+              setWipeStatus(null);
+              try {
+                const res = await wipeTeamChat(team.hunt_id, team.id);
+                setWipeStatus(`Wiped ${res.wiped} message${res.wiped === 1 ? '' : 's'}`);
+                setTimeout(() => setWipeStatus(null), 2400);
+              } catch (e) {
+                setWipeStatus(`Error: ${(e as Error).message}`);
+              } finally {
+                setWipeBusy(false);
+              }
+            }}
+            title="delete all chat messages for this team"
+          >
+            <Icon name="x" size={11} /> {wipeBusy ? 'wiping…' : 'wipe chat'}
+          </button>
         </div>
+        {wipeStatus && (
+          <div
+            style={{
+              fontSize: 11,
+              color: wipeStatus.startsWith('Error')
+                ? 'var(--terra-2)'
+                : 'var(--moss-2)',
+              marginTop: 4,
+            }}
+          >
+            {wipeStatus}
+          </div>
+        )}
         {jumpOpen && (
           <div
             className="card"

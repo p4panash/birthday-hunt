@@ -32,6 +32,7 @@ import {
   getTeamState,
   insertChatMessage,
   listRecentChat,
+  wipeChatForTeam,
   writeTeamState,
 } from '../db/queries';
 import { RateLimiter } from '../lib/rate-limits';
@@ -112,6 +113,17 @@ export class TeamSession extends DurableObject<Env> {
       return this.handleUpgrade(request);
     }
     const url = new URL(request.url);
+    // Internal admin RPC: wipe this team's chat. We perform the DELETE here
+    // (rather than in the admin route) so the operation runs through the
+    // DO's input gate, serialised with any concurrent chat_send. Without
+    // this, a player flooding chat_send during the admin's wipe could plant
+    // a message that survives the DELETE (race window is small but exists).
+    if (url.pathname === '/internal/chat/wipe' && request.method === 'POST') {
+      const wiped = await wipeChatForTeam(this.env.DB, this.teamId);
+      this.broadcast({ v: 1, type: 'chat_wiped' });
+      return Response.json({ ok: true, wiped });
+    }
+
     // Internal admin RPC: apply an action directly without going through the
     // WebSocket. The admin SPA POSTs here via stub.fetch when an operator
     // jumps a team to a specific step.
