@@ -367,7 +367,13 @@ function PhoneScreen({ moment, stop, clue, draft }: PhoneScreenProps) {
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0 }}>
           <MapCanvas tone="light" showLabels={false}>
-            <MapPin x={stop.x} y={stop.y} n={stop.order ?? 1} pulse large />
+            <MapPin
+              x={stop.x ?? 500}
+              y={stop.y ?? 350}
+              n={stop.order ?? 1}
+              pulse
+              large
+            />
           </MapCanvas>
         </div>
         <div

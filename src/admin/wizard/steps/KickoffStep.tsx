@@ -36,28 +36,17 @@ const LINE_LABELS: Record<LineId, string> = {
   reward: 'Finale',
 };
 
-// Map an AI-generated stop into the wizard's SuggestedStop shape. We don't
-// have real geocoding; coords are spread across the abstract viewBox so the
-// route line on Step 05 looks like a real path. Production geocoding lands
-// in a later spec; for now the user can adjust pin positions in-app.
+// Map an AI-generated stop into the wizard's SuggestedStop shape. The AI
+// provides real lat/lng for each venue (approximate but city-correct);
+// Step 05 renders these on a real Leaflet+OSM map.
 function synthStop(
-  s: { name: string; type: string; blurb: string },
+  s: { name: string; type: string; blurb: string; lat: number; lng: number },
   i: number,
-  total: number,
 ): SuggestedStop {
-  // Distribute around the centre on a gentle loop: alternate above/below
-  // the river, drift east as i grows. Keeps the route legible.
-  const cx = 500;
-  const cy = 280;
-  const radiusX = 220;
-  const radiusY = 110;
-  const angle = (i / Math.max(1, total)) * Math.PI * 1.4 - Math.PI / 2;
-  const x = Math.round(cx + Math.cos(angle) * radiusX + (i - total / 2) * 20);
-  const y = Math.round(cy + Math.sin(angle) * radiusY);
   return {
     id: `ai-${i}-${s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`,
-    x,
-    y,
+    lat: s.lat,
+    lng: s.lng,
     name: s.name,
     type: s.type,
     time: '20m',
@@ -198,7 +187,7 @@ export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
     // we ship that interaction.
     const aiStops = (
       draftPatch as Partial<HuntDraft> & {
-        stops?: { name: string; type: string; blurb: string }[];
+        stops?: { name: string; type: string; blurb: string; lat: number; lng: number }[];
       }
     ).stops;
     // Spread the categorical patch (title/recipient/etc.) but explicitly
@@ -210,7 +199,7 @@ export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
     void _aiStopsKey;
     const next: HuntDraft = { ...draft, ...categoricalPatch };
     if (Array.isArray(aiStops) && aiStops.length >= 3) {
-      next.stops = aiStops.map((s, i) => synthStop(s, i, aiStops.length));
+      next.stops = aiStops.map((s, i) => synthStop(s, i));
       next.suggestions = []; // AI already curated; show the chosen route only
     }
     onDraft(next);

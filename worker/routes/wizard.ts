@@ -71,6 +71,8 @@ const DraftResponse = z.object({
           name: z.string().min(1).max(80),
           type: z.string().min(1).max(40),
           blurb: z.string().min(1).max(240),
+          lat: z.number().min(-90).max(90),
+          lng: z.number().min(-180).max(180),
         }),
       )
       .min(3)
@@ -157,18 +159,26 @@ const DRAFT_TOOL: Anthropic.Tool = {
           stops: {
             type: 'array',
             description:
-              'Concrete stops named in the prompt\'s city, matching the theme/occasion. ALWAYS provide between 3 and stopCount real venues. For Cluj, examples: Form Space (bar), Marty (restaurant), TIFF House (cultural). For Baia Mare: Mining Museum, Old Town Square. Each stop needs a real-feeling name, a venue type (Café, Bar, Park, Landmark, etc.), and a one-sentence blurb of what makes it a fit.',
+              'Concrete stops in the prompt\'s city, matching theme/occasion. ALWAYS provide between 3 and stopCount real venues. Include approximate lat/lng for each — your geographic memory is fine for v1 (we don\'t need survey-grade accuracy, just close enough that the map pins land in the right neighbourhood). Example coordinates: Cluj central ~46.770N 23.589E, Bucharest centre ~44.439N 26.097E, Brașov ~45.642N 25.589E, Timișoara ~45.760N 21.225E, Baia Mare ~47.661N 23.580E.',
             minItems: 3,
             maxItems: 12,
             items: {
               type: 'object',
-              required: ['name', 'type', 'blurb'],
+              required: ['name', 'type', 'blurb', 'lat', 'lng'],
               properties: {
                 name: { type: 'string', description: 'Real venue name in the city.' },
                 type: { type: 'string', description: 'Café / Bar / Park / Landmark / Museum / Square / Garden / etc.' },
                 blurb: {
                   type: 'string',
                   description: 'One sentence: why this stop fits the hunt theme/occasion.',
+                },
+                lat: {
+                  type: 'number',
+                  description: 'Latitude in decimal degrees. Aim for the real venue location.',
+                },
+                lng: {
+                  type: 'number',
+                  description: 'Longitude in decimal degrees.',
                 },
               },
             },

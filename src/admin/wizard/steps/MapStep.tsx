@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Icon from '../../Icon';
 import type { HuntDraft, SuggestedStop } from '../data';
-import { MapCanvas, MapGhostPin, MapPin, MapRoute } from '../MapCanvas';
+import WizardMap from '../WizardMap';
 
 interface Props {
   draft: HuntDraft;
@@ -160,65 +160,21 @@ export default function MapStep({ draft, addStop, removeStop }: Props) {
           background: 'var(--bg-2)',
         }}
       >
-        <MapCanvas>
-          <MapRoute points={draft.stops.map((s) => [s.x, s.y])} />
-          {draft.suggestions.slice(0, 4).map((s) => (
-            <MapGhostPin
-              key={s.id}
-              x={s.x}
-              y={s.y}
-              label={s.name.toLowerCase().split(' ')[0]}
-              onClick={() => addStop(s)}
-            />
-          ))}
-          {draft.stops.map((s, i) => (
-            <MapPin
-              key={s.id}
-              x={s.x}
-              y={s.y}
-              n={i + 1}
-              label={
-                selectedId === s.id || hoveredId === s.id ? s.name : null
-              }
-              large={selectedId === s.id}
-              pulse={selectedId === s.id}
-              onClick={() => setSelected(s.id)}
-            />
-          ))}
-        </MapCanvas>
-
-        <div
-          style={{
-            position: 'absolute',
-            top: 18,
-            right: 18,
-            display: 'flex',
-            gap: 8,
-          }}
-        >
-          <button
-            className="btn btn-ghost"
-            style={{
-              background: 'var(--paper)',
-              boxShadow: 'var(--shadow-1)',
-              fontSize: 12,
-              padding: '8px 12px',
-            }}
-          >
-            <Icon name="map" size={14} /> Layers
-          </button>
-          <button
-            className="btn btn-ghost"
-            style={{
-              background: 'var(--paper)',
-              boxShadow: 'var(--shadow-1)',
-              fontSize: 12,
-              padding: '8px 12px',
-            }}
-          >
-            <Icon name="eye" size={14} /> Preview route
-          </button>
-        </div>
+        <WizardMap
+          city={draft.city}
+          stops={draft.stops}
+          suggestions={draft.suggestions}
+          selectedId={selectedId}
+          hoveredId={hoveredId}
+          onSelect={useCallback((id: string) => setSelected(id), [])}
+          onAddSuggestion={useCallback(
+            (id: string) => {
+              const s = draft.suggestions.find((x) => x.id === id);
+              if (s) addStop(s);
+            },
+            [draft.suggestions, addStop],
+          )}
+        />
 
         {selectedId && (
           <StopDetailCard

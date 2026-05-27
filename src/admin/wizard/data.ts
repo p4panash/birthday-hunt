@@ -63,6 +63,16 @@ export const CITIES = [
 
 export type CityId = (typeof CITIES)[number]['id'];
 
+// Centre lat/lng + default Leaflet zoom for each supported city.
+// Used to centre the real-tile map on Step 05 when no stops have coords
+// yet (e.g. before the AI patch arrives, or for a manual setup).
+export const CITY_CENTERS: Record<CityId, { lat: number; lng: number; zoom: number }> = {
+  cluj:      { lat: 46.7712, lng: 23.6236, zoom: 14 },
+  buc:       { lat: 44.4396, lng: 26.0963, zoom: 13 },
+  brasov:    { lat: 45.6427, lng: 25.5887, zoom: 14 },
+  timisoara: { lat: 45.7597, lng: 21.2300, zoom: 14 },
+};
+
 export interface Theme {
   id: string;
   title: string;
@@ -118,8 +128,14 @@ export const THEMES: Theme[] = [
 
 export interface SuggestedStop {
   id: string;
-  x: number;
-  y: number;
+  // Real geographic coords (decimal degrees). Used by the Leaflet map on
+  // Step 05 + by submit.ts when shaping the HuntConfig checkpoints.
+  lat: number;
+  lng: number;
+  // Legacy viewBox coords. Kept optional for backwards compat with code
+  // paths that haven't migrated; new stops only set lat/lng.
+  x?: number;
+  y?: number;
   name: string;
   hint?: string;
   type: string;
@@ -131,19 +147,19 @@ export interface SuggestedStop {
   tag: string;
 }
 
-// Curated suggested stops + chosen route (in viewBox coords).
-// x/y are on a 1000x700 map.
+// Curated default route (real Cluj-Napoca coords). When the user skips the
+// kickoff prompt, these populate Step 05 so the map isn't empty.
 export const SUGGESTED_STOPS: SuggestedStop[] = [
-  { id: 'klausenburg', x: 405, y: 195, name: 'Klausenburg Café',    hint: 'Where the date started', type: 'Café',      time: '15m', chosen: true, order: 1, blurb: 'A cup of black coffee, a window seat. Look for the cinnamon stars on the bar.', tag: 'Open · €€' },
-  { id: 'carturesti',  x: 540, y: 215, name: 'Cărturești Bookshop', hint: 'Page 73',                type: 'Bookshop',  time: '20m', chosen: true, order: 2, blurb: 'A note hidden inside the favourite book. Aisle "P—R".', tag: 'Open · €' },
-  { id: 'parcul',      x: 280, y: 410, name: 'Parcul Central',      hint: 'Under the third bench',  type: 'Park',      time: '10m', chosen: true, order: 3, blurb: 'East entrance, third bench in. A chalked X. Discreet.', tag: 'Free · 24h' },
-  { id: 'insomnia',    x: 470, y: 295, name: 'Insomnia Café',       hint: 'Talk to Andrei',         type: 'Bar',       time: '25m', chosen: true, order: 4, blurb: "Ask the bartender for \"the long way home\". They'll know.", tag: 'Open · €€' },
-  { id: 'cetatuia',    x: 615, y: 165, name: 'Cetățuia Lookout',    hint: 'Where we saw the city',  type: 'Viewpoint', time: '20m', chosen: true, order: 5, blurb: 'The northern wall, the bench facing the river. Sunset preferred.', tag: 'Free · day' },
-  { id: 'form',        x: 730, y: 380, name: 'Form Space',           type: 'Bar',      time: '20m', suggested: true, blurb: 'A bold cocktail spot — could fit a sixth stop if you want more.', tag: 'Open · €€€' },
-  { id: 'biserica',    x: 460, y: 165, name: 'Biserica Sf. Mihail',  type: 'Landmark', time: '15m', suggested: true, blurb: 'Gothic church — quiet at dusk, dramatic in photos.', tag: 'Free · day' },
-  { id: 'piata-muz',   x: 425, y: 240, name: 'Piața Muzeului',       type: 'Square',   time: '10m', suggested: true, blurb: 'Pretty square, lots of cafés. Good photo stop.', tag: 'Open · 24h' },
-  { id: 'botanic',     x: 220, y: 525, name: 'Grădina Botanică',     type: 'Garden',   time: '40m', suggested: true, blurb: 'Beautiful but big — only if your route has time.', tag: 'Open · €' },
-  { id: 'janis',       x: 590, y: 335, name: 'Janis Pub',            type: 'Bar',      time: '25m', suggested: true, blurb: 'A loud, fun stop — a good "celebration" finale option.', tag: 'Open · €€' },
+  { id: 'klausenburg', lat: 46.7715, lng: 23.5905, name: 'Klausenburg Café',    hint: 'Where the date started', type: 'Café',      time: '15m', chosen: true, order: 1, blurb: 'A cup of black coffee, a window seat. Look for the cinnamon stars on the bar.', tag: 'Open · €€' },
+  { id: 'carturesti',  lat: 46.7700, lng: 23.5963, name: 'Cărturești Bookshop', hint: 'Page 73',                type: 'Bookshop',  time: '20m', chosen: true, order: 2, blurb: 'A note hidden inside the favourite book. Aisle "P—R".', tag: 'Open · €' },
+  { id: 'parcul',      lat: 46.7672, lng: 23.5798, name: 'Parcul Central',      hint: 'Under the third bench',  type: 'Park',      time: '10m', chosen: true, order: 3, blurb: 'East entrance, third bench in. A chalked X. Discreet.', tag: 'Free · 24h' },
+  { id: 'insomnia',    lat: 46.7691, lng: 23.5897, name: 'Insomnia Café',       hint: 'Talk to Andrei',         type: 'Bar',       time: '25m', chosen: true, order: 4, blurb: "Ask the bartender for \"the long way home\". They'll know.", tag: 'Open · €€' },
+  { id: 'cetatuia',    lat: 46.7747, lng: 23.5859, name: 'Cetățuia Lookout',    hint: 'Where we saw the city',  type: 'Viewpoint', time: '20m', chosen: true, order: 5, blurb: 'The northern wall, the bench facing the river. Sunset preferred.', tag: 'Free · day' },
+  { id: 'form',        lat: 46.7681, lng: 23.6035, name: 'Form Space',           type: 'Bar',      time: '20m', suggested: true, blurb: 'A bold cocktail spot — could fit a sixth stop if you want more.', tag: 'Open · €€€' },
+  { id: 'biserica',    lat: 46.7702, lng: 23.5897, name: 'Biserica Sf. Mihail',  type: 'Landmark', time: '15m', suggested: true, blurb: 'Gothic church — quiet at dusk, dramatic in photos.', tag: 'Free · day' },
+  { id: 'piata-muz',   lat: 46.7723, lng: 23.5906, name: 'Piața Muzeului',       type: 'Square',   time: '10m', suggested: true, blurb: 'Pretty square, lots of cafés. Good photo stop.', tag: 'Open · 24h' },
+  { id: 'botanic',     lat: 46.7634, lng: 23.5872, name: 'Grădina Botanică',     type: 'Garden',   time: '40m', suggested: true, blurb: 'Beautiful but big — only if your route has time.', tag: 'Open · €' },
+  { id: 'janis',       lat: 46.7715, lng: 23.5955, name: 'Janis Pub',            type: 'Bar',      time: '25m', suggested: true, blurb: 'A loud, fun stop — a good "celebration" finale option.', tag: 'Open · €€' },
 ];
 
 export interface DraftClue {

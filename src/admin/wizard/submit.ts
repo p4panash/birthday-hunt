@@ -17,24 +17,15 @@ function clueText(draft: HuntDraft, stopId: string): string {
   return draft.clues[stopId]?.text ?? '';
 }
 
-// Convert wizard pixel coords (1000x700 viewBox over Cluj-Napoca) to fake
-// lat/lng around the centre of the picked city. Real geocoding is out of
-// scope for v1; the existing solo flow works on relative position anyway.
-function pixelToLatLng(x: number, y: number): { lat: number; lng: number } {
-  // Cluj-Napoca centre roughly at 46.770, 23.589. 1000x700 → ~1.6km span.
-  const baseLat = 46.77;
-  const baseLng = 23.589;
-  const dLat = ((350 - y) / 700) * 0.014; // north is up on viewBox
-  const dLng = ((x - 500) / 1000) * 0.022;
-  return { lat: baseLat + dLat, lng: baseLng + dLng };
-}
-
 function stopToCheckpoint(
   stop: HuntDraft['stops'][number],
   draft: HuntDraft,
   idx: 1 | 2 | 3,
 ): Checkpoint {
-  const { lat, lng } = pixelToLatLng(stop.x, stop.y);
+  // Stops always carry real lat/lng now — either from the AI patch
+  // (Kickoff path) or from the curated SUGGESTED_STOPS defaults
+  // (Skip path).
+  const { lat, lng } = stop;
   return {
     id: idx,
     name: stop.name,
@@ -69,6 +60,14 @@ export function draftToHuntConfig(draft: HuntDraft): { input: CreateHuntInput } 
     );
   }
   const trio = draft.stops.slice(0, 3);
+  for (const s of trio) {
+    if (typeof s.lat !== 'number' || typeof s.lng !== 'number') {
+      throw new Error(
+        `Stop "${s.name}" is missing GPS coordinates. ` +
+          'Try re-running the wizard or drop a pin on Step 05.',
+      );
+    }
+  }
   const checkpoints: [Checkpoint, Checkpoint, Checkpoint] = [
     stopToCheckpoint(trio[0], draft, 1),
     stopToCheckpoint(trio[1], draft, 2),
