@@ -104,10 +104,14 @@ const DRAFT_TOOL: Anthropic.Tool = {
       patch: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: 'Short lowercase slug.' },
+          title: {
+            type: 'string',
+            description:
+              'ALWAYS provide a short lowercase slug, dashes between words. Examples: "andras-30th-brasov", "diana-proposal-sunset", "boyz-mystic-bm".',
+          },
           recipient: {
             type: 'string',
-            description: 'First name OR group name like "the boyz".',
+            description: 'First name OR group name like "the boyz", "my parents", "the squad".',
           },
           occasion: {
             type: 'string',
@@ -122,7 +126,7 @@ const DRAFT_TOOL: Anthropic.Tool = {
               'just-because',
             ],
             description:
-              'team covers "boys night", "girls weekend", "the squad", "the boyz", "my crew", team-building. just-because is the catch-all of last resort.',
+              'team covers "boys night", "girls weekend", "the squad", "the boyz", "my crew", "cu prieteni", team-building. just-because is the catch-all of last resort.',
           },
           city: {
             type: 'string',
@@ -133,10 +137,13 @@ const DRAFT_TOOL: Anthropic.Tool = {
           theme: {
             type: 'string',
             enum: ['firsts', 'cinema', 'fairytale', 'nocturne', 'sunrise', 'custom'],
+            description:
+              'Map themes by FEEL, not by default. firsts = romantic + personal memories (couples, anniversaries, proposals). cinema = TIFF / movies. fairytale = whimsical/literary. nocturne = night/dark/cocktails. sunrise = whole-day or dawn/sunset. custom = use this when nothing else fits (group hunts, kids parties, tourist tours, generic prompts). DO NOT default to firsts unless the prompt has a romantic/couple/anniversary signal.',
           },
           stopCount: { type: 'integer', minimum: 3, maximum: 12 },
           difficulty: { type: 'string', enum: ['sweet', 'classic', 'cruel'] },
         },
+        required: ['title'],
       },
     },
     required: ['lines', 'patch'],
@@ -156,23 +163,47 @@ Rules for each line value:
 Each line value MUST be under 80 characters.
 
 Patch fields are typed by the tool schema. Prefer a specific occasion over
-just-because whenever any group/relationship/age signal exists.
-Defaults when the user doesn't say: area="Centru istoric", theme=firsts,
-stopCount=5, difficulty=sweet.
+just-because whenever any group/relationship/age signal exists. Theme should
+be picked by FEEL — do NOT default to "firsts" unless the prompt is romantic
+or anniversary-coded. Use "custom" for group hunts, kids, tourist, or any
+prompt without a clear theme cue.
+
+Defaults when the user doesn't say: area="Centru istoric", stopCount=5,
+difficulty=sweet. ALWAYS provide patch.title.
 
 Worked examples:
 
 prompt: "Boys' night mystery hunt for my crew in Cluj"
-→ patch.occasion: "team", patch.recipient: "the boyz", patch.city: "cluj"
+→ title: "boyz-mystery-cluj", occasion: "team", recipient: "the boyz",
+  city: "cluj", theme: "custom"
 
-prompt: "30th birthday for Andra in Brașov"
-→ patch.occasion: "birthday", patch.recipient: "Andra", patch.city: "brasov"
+prompt: "30th birthday for Andra in Brașov, fun and witty"
+→ title: "andras-30th-brasov", occasion: "birthday", recipient: "Andra",
+  city: "brasov", theme: "custom"
 
-prompt: "Bachelorette for Maria in București, after dark"
-→ patch.occasion: "bachelor", patch.theme: "nocturne", patch.city: "buc"
+prompt: "Marriage proposal for Diana in Cluj at sunset"
+→ title: "diana-proposal-cluj", occasion: "proposal", recipient: "Diana",
+  city: "cluj", theme: "sunrise", difficulty: "sweet"
 
-prompt: "Walking tour for two visiting friends from Spain"
-→ patch.occasion: "tourist", patch.recipient: "the visitors"`;
+prompt: "Bachelorette for Maria in București, after dark, a bit cruel"
+→ title: "maria-bachelorette-buc", occasion: "bachelor", recipient: "Maria",
+  city: "buc", theme: "nocturne", difficulty: "cruel"
+
+prompt: "Walking tour for two visiting friends from Spain in Cluj"
+→ title: "cluj-walking-tour", occasion: "tourist", recipient: "the visitors",
+  city: "cluj", theme: "custom"
+
+prompt: "Kids party for 8-year-old Toma in Timișoara"
+→ title: "tomas-8th-timisoara", occasion: "kids", recipient: "Toma",
+  city: "timisoara", theme: "custom", difficulty: "sweet"
+
+prompt: "Hunt pentru ziua Mariei in centrul Clujului, cu prieteni"
+→ title: "maria-bday-cluj", occasion: "birthday", recipient: "Maria",
+  city: "cluj", theme: "custom", area: "Centru istoric"
+
+prompt: "Anniversary surprise for my wife — 10 years together"
+→ title: "10-years-anniversary", occasion: "anniversary", recipient: "my wife",
+  theme: "firsts"`;
 
 // Pull out a label→value pair from the in-flight tool-input JSON. As Claude
 // streams, the partial string looks like:
