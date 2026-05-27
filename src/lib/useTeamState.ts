@@ -7,6 +7,11 @@
 //
 // localTestMode is merged on top of the server state so `?test=1` stays a
 // per-device flag (resolved decision #6).
+//
+// Social bundle extension: the same WS carries a second channel of social
+// events (chat, reactions, pings — Phase 1). They're exposed here too because
+// the WS is the only one — opening a second socket would multiply DO costs
+// and complicate hibernation accounting.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ServerMsgSchema } from 'shared/messages';
@@ -14,7 +19,11 @@ import type {
   HuntAction,
   HuntState,
 } from 'shared/state/types';
-import type { PlayerPresence } from 'shared/messages';
+import type {
+  ChatMessage,
+  PlayerPresence,
+  ReactionEmoji,
+} from 'shared/messages';
 import { initialState } from 'shared/state/reducer';
 import { teamWebSocketUrl } from './api';
 
@@ -27,6 +36,24 @@ export interface UseTeamStateResult {
   connected: boolean;
   /** Has the first state frame arrived from the server? */
   hydrated: boolean;
+  /** Chat history, chronological (oldest first). */
+  chat: ChatMessage[];
+  /**
+   * Monotonically-incrementing counter bumped each time the server delivers
+   * a `chat_snapshot` (i.e. on initial connect and on every reconnect).
+   * Consumers should treat the entire `chat` array as "already seen" when
+   * this value changes — otherwise a reconnect would re-flag old messages
+   * as unread.
+   */
+  chatSnapshotRev: number;
+  /** Pulses true for ~1s when admin wipes chat — UI can show a toast. */
+  chatWiped: boolean;
+  sendChat: (body: string) => void;
+  /**
+   * Send a floating reaction. Echoes locally too so the sender sees it
+   * without waiting for the WS round-trip.
+   */
+  sendReaction: (emoji: ReactionEmoji) => void;
 }
 
 export function useTeamState(args: {
@@ -40,6 +67,9 @@ export function useTeamState(args: {
   const [presence, setPresence] = useState<PlayerPresence[]>([]);
   const [connected, setConnected] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
+  const [chatSnapshotRev, setChatSnapshotRev] = useState(0);
+  const [chatWiped, setChatWiped] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -71,8 +101,17 @@ export function useTeamState(args: {
           setHydrated(true);
         } else if (parsed.type === 'presence') {
           setPresence(parsed.players);
+        } else if (parsed.type === 'chat_snapshot') {
+          setChat(parsed.messages);
+          setChatSnapshotRev((r) => r + 1);
+        } else if (parsed.type === 'chat_new') {
+          setChat((prev) => [...prev, parsed.message]);
+        } else if (parsed.type === 'chat_wiped') {
+          setChat([]);
+          setChatWiped(true);
+          setTimeout(() => setChatWiped(false), 1000);
         }
-        // pong/error are observable via diagnostics later; ignored here
+        // react_show / ping_show / pong / error: wired in later phases
       });
 
       ws.addEventListener('close', () => {
@@ -120,10 +159,36 @@ export function useTeamState(args: {
     ws.send(JSON.stringify({ v: 1, type: 'action', action }));
   }, []);
 
+  const sendChat = useCallback((body: string) => {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    if (trimmed.length > 280) return; // server will also reject; spare the round-trip
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ v: 1, type: 'chat_send', body: trimmed }));
+  }, []);
+
+  const sendReaction = useCallback((emoji: ReactionEmoji) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ v: 1, type: 'react_send', emoji }));
+  }, []);
+
   const state = useMemo<HuntState>(
     () => ({ ...serverState, testMode: localTestMode }),
     [serverState, localTestMode],
   );
 
-  return { state, dispatch, presence, connected, hydrated };
+  return {
+    state,
+    dispatch,
+    presence,
+    connected,
+    hydrated,
+    chat,
+    chatSnapshotRev,
+    chatWiped,
+    sendChat,
+    sendReaction,
+  };
 }

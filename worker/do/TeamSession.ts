@@ -21,10 +21,20 @@ import type {
   HuntState,
   HuntStep,
 } from '../../shared/state/types';
-import type { PlayerPresence, ServerMsg } from '../../shared/messages';
+import type {
+  ChatMessage,
+  PlayerPresence,
+  ServerMsg,
+} from '../../shared/messages';
 import { ClientMsgSchema } from '../../shared/messages';
 import { HuntActionSchema } from '../../shared/state/schema';
-import { getTeamState, writeTeamState } from '../db/queries';
+import {
+  getTeamState,
+  insertChatMessage,
+  listRecentChat,
+  writeTeamState,
+} from '../db/queries';
+import { RateLimiter } from '../lib/rate-limits';
 import type { Env } from '../index';
 
 interface Attachment {
@@ -36,6 +46,7 @@ interface Attachment {
 export class TeamSession extends DurableObject<Env> {
   private state: HuntState = initialState;
   private loaded = false;
+  private rateLimiter = new RateLimiter();
 
   private get teamId(): string {
     const name = this.ctx.id.name;
@@ -148,6 +159,43 @@ export class TeamSession extends DurableObject<Env> {
 
     // Initial state frame — client doesn't render until this lands.
     server.send(stringify({ v: 1, type: 'state', state: this.state }));
+
+    // Chat snapshot (last 50, chronological oldest-first). Sent right after
+    // state so the drawer can hydrate from the very first frame.
+    const recent = await listRecentChat(this.env.DB, this.teamId, 50);
+    const messages: ChatMessage[] = recent
+      .map((r) => ({
+        id: r.id,
+        player_id: r.player_id,
+        player_name: '', // resolved below from attachments if possible
+        body: r.body,
+        created_at: r.created_at,
+      }))
+      .reverse(); // listRecentChat returns newest-first
+    // Resolve player_name for each row from the players table (one round-trip
+    // for the distinct player_ids).
+    const ids = [...new Set(messages.map((m) => m.player_id))];
+    if (ids.length > 0) {
+      const placeholders = ids.map(() => '?').join(',');
+      // Defense-in-depth: constrain to this team. player_ids should already
+      // be team-scoped via the join flow, but a stale or mis-assigned row
+      // could otherwise surface another team's name.
+      const rows = await this.env.DB
+        .prepare(
+          `SELECT id, name FROM players
+           WHERE id IN (${placeholders}) AND team_id = ?`,
+        )
+        .bind(...ids, this.teamId)
+        .all<{ id: string; name: string }>();
+      const nameById = new Map(
+        (rows.results ?? []).map((r) => [r.id, r.name] as const),
+      );
+      for (const m of messages) {
+        m.player_name = nameById.get(m.player_id) ?? '(removed)';
+      }
+    }
+    server.send(stringify({ v: 1, type: 'chat_snapshot', messages }));
+
     this.broadcastPresence();
 
     return new Response(null, { status: 101, webSocket: client });
@@ -191,6 +239,91 @@ export class TeamSession extends DurableObject<Env> {
           }),
         );
       }
+      return;
+    }
+
+    if (parsed.type === 'chat_send') {
+      await this.handleChatSend(ws, parsed.body);
+      return;
+    }
+  }
+
+  // ── Chat handler ──────────────────────────────────────────────────
+
+  private async handleChatSend(ws: WebSocket, rawBody: unknown): Promise<void> {
+    const body = typeof rawBody === 'string' ? rawBody.trim() : '';
+    if (body.length === 0) {
+      ws.send(
+        stringify({
+          v: 1,
+          type: 'error',
+          code: 'body_empty',
+          message: 'chat body cannot be empty',
+        }),
+      );
+      return;
+    }
+    if (body.length > 280) {
+      ws.send(
+        stringify({
+          v: 1,
+          type: 'error',
+          code: 'body_too_long',
+          message: 'chat body exceeds 280 characters',
+        }),
+      );
+      return;
+    }
+
+    // Resolve sender identity from the attachment — never trust the envelope.
+    const att = this.attachmentFor(ws);
+    if (!att) {
+      ws.send(
+        stringify({
+          v: 1,
+          type: 'error',
+          code: 'not_attached',
+          message: 'socket has no player attachment',
+        }),
+      );
+      return;
+    }
+
+    const limit = this.rateLimiter.check('chat', att.playerId);
+    if (!limit.ok) {
+      ws.send(
+        stringify({
+          v: 1,
+          type: 'error',
+          code: 'rate_limited',
+          message: 'too many messages, slow down',
+          retry_after_ms: limit.retry_after_ms,
+        }),
+      );
+      return;
+    }
+
+    const row = await insertChatMessage(this.env.DB, {
+      team_id: this.teamId,
+      player_id: att.playerId,
+      body,
+    });
+
+    const message: ChatMessage = {
+      id: row.id,
+      player_id: row.player_id,
+      player_name: att.name,
+      body: row.body,
+      created_at: row.created_at,
+    };
+    this.broadcast({ v: 1, type: 'chat_new', message });
+  }
+
+  private attachmentFor(ws: WebSocket): Attachment | null {
+    try {
+      return (ws.deserializeAttachment() as Attachment | null) ?? null;
+    } catch {
+      return null;
     }
   }
 
