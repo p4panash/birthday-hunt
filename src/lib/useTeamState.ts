@@ -54,7 +54,22 @@ export interface UseTeamStateResult {
    * without waiting for the WS round-trip.
    */
   sendReaction: (emoji: ReactionEmoji) => void;
+  /**
+   * Active floating reactions, garbage-collected automatically by the hook
+   * after their 2-second TTL. Each render passes these to FloatingReactionLayer.
+   */
+  reactions: FloatingReaction[];
 }
+
+export interface FloatingReaction {
+  id: string;
+  emoji: ReactionEmoji;
+  sender_id: string;
+  sender_name: string;
+  expires_at: number;
+}
+
+const REACTION_TTL_MS = 2_000;
 
 export function useTeamState(args: {
   teamId: string;
@@ -70,6 +85,7 @@ export function useTeamState(args: {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [chatSnapshotRev, setChatSnapshotRev] = useState(0);
   const [chatWiped, setChatWiped] = useState(false);
+  const [reactions, setReactions] = useState<FloatingReaction[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -113,8 +129,26 @@ export function useTeamState(args: {
           setChat([]);
           setChatWiped(true);
           setTimeout(() => setChatWiped(false), 1000);
+        } else if (parsed.type === 'react_show') {
+          // Idempotent on id — local-echo + server broadcast send the same
+          // reaction; dedupe by id so we don't double-render the sender's
+          // own emoji.
+          setReactions((prev) =>
+            prev.some((r) => r.id === parsed.id)
+              ? prev
+              : [
+                  ...prev,
+                  {
+                    id: parsed.id,
+                    emoji: parsed.emoji,
+                    sender_id: parsed.sender_id,
+                    sender_name: parsed.sender_name,
+                    expires_at: Date.now() + REACTION_TTL_MS,
+                  },
+                ],
+          );
         }
-        // react_show / ping_show / pong / error: wired in later phases
+        // ping_show / pong / error: wired in later phases
       });
 
       ws.addEventListener('close', () => {
@@ -171,11 +205,44 @@ export function useTeamState(args: {
     ws.send(JSON.stringify({ v: 1, type: 'chat_send', body: trimmed }));
   }, []);
 
-  const sendReaction = useCallback((emoji: ReactionEmoji) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({ v: 1, type: 'react_send', emoji }));
+  // GC stale reactions every 250ms. Cheap; reactions max out at ~120/min
+  // under the rate-limit cap.
+  useEffect(() => {
+    const handle = setInterval(() => {
+      const now = Date.now();
+      setReactions((prev) => {
+        const next = prev.filter((r) => r.expires_at > now);
+        return next.length === prev.length ? prev : next;
+      });
+    }, 250);
+    return () => clearInterval(handle);
   }, []);
+
+  const sendReaction = useCallback(
+    (emoji: ReactionEmoji) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      // Local echo: render immediately under a client-generated id so the
+      // sender doesn't wait for the round-trip. The server will broadcast
+      // its own id; the reducer dedupes server frames whose id matches a
+      // local echo (we use a `local-` prefix to keep keyspaces disjoint).
+      const localId = `local-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`;
+      setReactions((prev) => [
+        ...prev,
+        {
+          id: localId,
+          emoji,
+          sender_id: playerId,
+          sender_name: '', // local echo doesn't render the name
+          expires_at: Date.now() + REACTION_TTL_MS,
+        },
+      ]);
+      ws.send(JSON.stringify({ v: 1, type: 'react_send', emoji }));
+    },
+    [playerId],
+  );
 
   const state = useMemo<HuntState>(
     () => ({ ...serverState, testMode: localTestMode }),
@@ -193,5 +260,6 @@ export function useTeamState(args: {
     chatWiped,
     sendChat,
     sendReaction,
+    reactions,
   };
 }

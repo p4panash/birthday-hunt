@@ -258,6 +258,11 @@ export class TeamSession extends DurableObject<Env> {
       await this.handleChatSend(ws, parsed.body);
       return;
     }
+
+    if (parsed.type === 'react_send') {
+      this.handleReactSend(ws, parsed.emoji);
+      return;
+    }
   }
 
   // ── Chat handler ──────────────────────────────────────────────────
@@ -329,6 +334,50 @@ export class TeamSession extends DurableObject<Env> {
       created_at: row.created_at,
     };
     this.broadcast({ v: 1, type: 'chat_new', message });
+  }
+
+  // ── Reaction handler (ephemeral, no D1) ───────────────────────────
+
+  private reactSeq = 0;
+
+  private handleReactSend(
+    ws: WebSocket,
+    emoji: import('../../shared/messages').ReactionEmoji,
+  ): void {
+    const att = this.attachmentFor(ws);
+    if (!att) {
+      ws.send(
+        stringify({
+          v: 1,
+          type: 'error',
+          code: 'not_attached',
+          message: 'socket has no player attachment',
+        }),
+      );
+      return;
+    }
+    const limit = this.rateLimiter.check('reaction', att.playerId);
+    if (!limit.ok) {
+      ws.send(
+        stringify({
+          v: 1,
+          type: 'error',
+          code: 'rate_limited',
+          message: 'too many reactions, slow down',
+          retry_after_ms: limit.retry_after_ms,
+        }),
+      );
+      return;
+    }
+    const id = `r${Date.now().toString(36)}${(++this.reactSeq).toString(36)}`;
+    this.broadcast({
+      v: 1,
+      type: 'react_show',
+      emoji,
+      sender_id: att.playerId,
+      sender_name: att.name,
+      id,
+    });
   }
 
   private attachmentFor(ws: WebSocket): Attachment | null {

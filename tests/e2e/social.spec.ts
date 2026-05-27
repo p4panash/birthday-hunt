@@ -82,6 +82,44 @@ test.describe('Social bundle — chat (P1)', () => {
   });
 });
 
+test.describe('Social bundle — reactions (P2)', () => {
+  test('tapping an emoji broadcasts to teammates and floats on their screen', async ({
+    browser,
+    request,
+  }) => {
+    const seed = await seedHuntAndTeam(request);
+    const ctxA = await browser.newContext();
+    const ctxB = await browser.newContext();
+    const pageA = await ctxA.newPage();
+    const pageB = await ctxB.newPage();
+    try {
+      await joinAs(pageA, seed.inviteCode, 'andi');
+      await joinAs(pageB, seed.inviteCode, 'maria');
+
+      // Sanity: B's reaction layer present (no reactions yet).
+      await expect(pageB.getByTestId('reaction-layer')).toBeAttached();
+
+      // A taps the 🎉 emoji.
+      await pageA.getByTestId('reaction-🎉').click();
+
+      // B sees at least one floating-reaction with that emoji within 2s.
+      await expect(
+        pageB.locator('[data-testid="floating-reaction"][data-emoji="🎉"]'),
+      ).toBeVisible({ timeout: 2_000 });
+    } finally {
+      await ctxA.close();
+      await ctxB.close();
+    }
+  });
+
+  test('solo mode has no reaction tray', async ({ page }) => {
+    await clearTeamSession(page);
+    await page.goto('/');
+    await expect(page.locator('.eyebrow')).toBeVisible({ timeout: 10_000 });
+    expect(await page.getByTestId('reaction-tray').count()).toBe(0);
+  });
+});
+
 test.describe('Social bundle — admin wipe (P1.5)', () => {
   test('admin wipe clears both players\' drawers and writes audit log', async ({
     browser,

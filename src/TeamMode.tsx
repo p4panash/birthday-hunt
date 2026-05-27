@@ -15,6 +15,8 @@ import type { TeamSession } from './lib/teamSession';
 import GameShell from './GameShell';
 import PresenceRibbon from './components/PresenceRibbon';
 import ChatDrawer from './components/ChatDrawer';
+import ReactionTray from './components/ReactionTray';
+import FloatingReactionLayer from './components/FloatingReactionLayer';
 
 const QR_SRC = `${import.meta.env.BASE_URL}qr.jpg`;
 
@@ -32,6 +34,8 @@ export default function TeamMode({ session }: Props) {
     chat,
     chatSnapshotRev,
     sendChat,
+    reactions,
+    sendReaction,
   } = useTeamState({
     teamId: session.team_id,
     playerId: session.player_id,
@@ -113,6 +117,8 @@ export default function TeamMode({ session }: Props) {
         selfPlayerId={session.player_id}
         onSend={sendChat}
       />
+      <ReactionTray onReact={sendReaction} />
+      <FloatingReactionLayer reactions={reactions} />
     </>
   );
 }
