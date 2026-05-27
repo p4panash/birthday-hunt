@@ -48,7 +48,11 @@ export const ClientMsgSchema = z.discriminatedUnion('type', [
   z.object({
     v: V,
     type: z.literal('chat_send'),
-    body: z.string(),
+    // Zod-level cap matches the runtime cap in TeamSession.handleChatSend.
+    // Fails fast on the way in so malformed/oversized frames never reach
+    // the handler (DoS amplifier: a 900 KB body would otherwise force
+    // Zod to fully materialise the string before the runtime check rejects).
+    body: z.string().max(280),
   }),
   z.object({
     v: V,

@@ -157,7 +157,12 @@ describe('TeamSession chat — body validation', () => {
     a.ws.send(JSON.stringify({ v: 1, type: 'chat_send', body: tooLong }));
 
     await waitFor(() => !!findMsg(a.msgs, 'error'));
-    expect(findMsg(a.msgs, 'error')!.code).toBe('body_too_long');
+    // Zod's .max(280) on chat_send.body now fails fast at parse time, so the
+    // error code is the generic 'invalid_message' (DoS prevention — see
+    // shared/messages.ts). Either path is acceptable; both reject identically
+    // from the player's perspective.
+    const code = findMsg(a.msgs, 'error')!.code;
+    expect(['invalid_message', 'body_too_long']).toContain(code);
     // B must not see any chat_new.
     expect(findMsg(b.msgs, 'chat_new')).toBeUndefined();
     // No row persisted.

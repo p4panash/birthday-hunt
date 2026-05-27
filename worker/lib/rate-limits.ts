@@ -42,12 +42,14 @@ export class RateLimiter {
     const stored = this.hits.get(key) ?? [];
     const recent = stored.filter((t) => t >= minuteAgo);
 
-    const inLastSecond = recent.filter((t) => t >= secondAgo).length;
-    if (inLastSecond >= limit.perSecond) {
-      const oldestInWindow = recent.find((t) => t >= secondAgo)!;
-      // Clamp to ≥1 — clock skew / exact-boundary timestamps could otherwise
-      // produce 0 or negative, which clients would interpret as "no wait".
-      const wait = Math.max(1, 1_000 - (now - oldestInWindow));
+    const inSecond = recent.filter((t) => t >= secondAgo);
+    if (inSecond.length >= limit.perSecond) {
+      // Wait until the NEWEST event in the second exits — at that point we
+      // drop one event, freeing a slot. Using the oldest would tell clients
+      // to retry while still inside the cap, looping them through repeated
+      // rejections.
+      const newestInWindow = inSecond[inSecond.length - 1]!;
+      const wait = Math.max(1, 1_000 - (now - newestInWindow));
       return { ok: false, retry_after_ms: wait };
     }
 

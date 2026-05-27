@@ -193,6 +193,10 @@ export function useTeamState(args: {
       });
 
       ws.addEventListener('close', () => {
+        // Same guard as the message listener: if this socket is no longer
+        // the current one (StrictMode cleanup or a successor connect),
+        // don't schedule a reconnect — there's already a live successor.
+        if (wsRef.current !== ws) return;
         setConnected(false);
         if (cancelledRef.current) return;
         const delay = Math.min(
