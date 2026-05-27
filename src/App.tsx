@@ -13,6 +13,7 @@ import AdminApp from './admin/AdminApp';
 import { loadTeamSession, type TeamSession } from './lib/teamSession';
 import OfflineBanner from './pwa/OfflineBanner';
 import UpdateToast from './pwa/UpdateToast';
+import InstallPrompt from './pwa/InstallPrompt';
 
 type Route = 'admin' | 'join' | 'team' | 'solo';
 
@@ -49,6 +50,7 @@ export default function App() {
     <>
       <OfflineBanner />
       <UpdateToast />
+      <InstallPrompt />
       {route === 'join' ? (
         <Join
           onJoined={() => {
