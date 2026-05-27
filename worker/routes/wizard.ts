@@ -65,6 +65,18 @@ const DraftResponse = z.object({
       .catch(undefined),
     stopCount: z.number().int().min(3).max(12).optional().catch(undefined),
     difficulty: z.enum(['sweet', 'classic', 'cruel']).optional().catch(undefined),
+    stops: z
+      .array(
+        z.object({
+          name: z.string().min(1).max(80),
+          type: z.string().min(1).max(40),
+          blurb: z.string().min(1).max(240),
+        }),
+      )
+      .min(3)
+      .max(12)
+      .optional()
+      .catch(undefined),
   }),
 });
 
@@ -142,8 +154,27 @@ const DRAFT_TOOL: Anthropic.Tool = {
           },
           stopCount: { type: 'integer', minimum: 3, maximum: 12 },
           difficulty: { type: 'string', enum: ['sweet', 'classic', 'cruel'] },
+          stops: {
+            type: 'array',
+            description:
+              'Concrete stops named in the prompt\'s city, matching the theme/occasion. ALWAYS provide between 3 and stopCount real venues. For Cluj, examples: Form Space (bar), Marty (restaurant), TIFF House (cultural). For Baia Mare: Mining Museum, Old Town Square. Each stop needs a real-feeling name, a venue type (Café, Bar, Park, Landmark, etc.), and a one-sentence blurb of what makes it a fit.',
+            minItems: 3,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              required: ['name', 'type', 'blurb'],
+              properties: {
+                name: { type: 'string', description: 'Real venue name in the city.' },
+                type: { type: 'string', description: 'Café / Bar / Park / Landmark / Museum / Square / Garden / etc.' },
+                blurb: {
+                  type: 'string',
+                  description: 'One sentence: why this stop fits the hunt theme/occasion.',
+                },
+              },
+            },
+          },
         },
-        required: ['title'],
+        required: ['title', 'stops'],
       },
     },
     required: ['lines', 'patch'],
@@ -169,7 +200,13 @@ or anniversary-coded. Use "custom" for group hunts, kids, tourist, or any
 prompt without a clear theme cue.
 
 Defaults when the user doesn't say: area="Centru istoric", stopCount=5,
-difficulty=sweet. ALWAYS provide patch.title.
+difficulty=sweet. ALWAYS provide patch.title and patch.stops.
+
+For patch.stops: invent real-feeling, theme-appropriate venues in the
+prompt's city. "Petrolhead" → garages, racetracks, classic-car cafés.
+"Bookish" → libraries, bookshops. "Foodie" → restaurants, markets.
+Match the energy. Do NOT default to the same 5 romantic Cluj cafés on
+every prompt — the stops MUST reflect the prompt's theme + city.
 
 Worked examples:
 

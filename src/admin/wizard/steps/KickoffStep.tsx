@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../Icon';
-import { KICKOFF_PROMPTS, type HuntDraft } from '../data';
+import { KICKOFF_PROMPTS, type HuntDraft, type SuggestedStop } from '../data';
 import { MapCanvas } from '../MapCanvas';
 
 interface Props {
@@ -35,6 +35,38 @@ const LINE_LABELS: Record<LineId, string> = {
   stops: 'Suggested stops',
   reward: 'Finale',
 };
+
+// Map an AI-generated stop into the wizard's SuggestedStop shape. We don't
+// have real geocoding; coords are spread across the abstract viewBox so the
+// route line on Step 05 looks like a real path. Production geocoding lands
+// in a later spec; for now the user can adjust pin positions in-app.
+function synthStop(
+  s: { name: string; type: string; blurb: string },
+  i: number,
+  total: number,
+): SuggestedStop {
+  // Distribute around the centre on a gentle loop: alternate above/below
+  // the river, drift east as i grows. Keeps the route legible.
+  const cx = 500;
+  const cy = 280;
+  const radiusX = 220;
+  const radiusY = 110;
+  const angle = (i / Math.max(1, total)) * Math.PI * 1.4 - Math.PI / 2;
+  const x = Math.round(cx + Math.cos(angle) * radiusX + (i - total / 2) * 20);
+  const y = Math.round(cy + Math.sin(angle) * radiusY);
+  return {
+    id: `ai-${i}-${s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`,
+    x,
+    y,
+    name: s.name,
+    type: s.type,
+    time: '20m',
+    chosen: true,
+    order: i + 1,
+    blurb: s.blurb,
+    tag: 'AI suggested',
+  };
+}
 
 const LOCAL_FALLBACK: Record<LineId, string> = {
   occasion: 'Birthday · Mihaela · 14 Jun 2026',
@@ -155,11 +187,33 @@ export default function KickoffStep({ draft, onDraft, onSkip }: Props) {
   };
 
   const applyDraft = () => {
-    if (draftPatch) {
-      onDraft({ ...draft, ...draftPatch });
-    } else {
+    if (!draftPatch) {
       onDraft(draft);
+      return;
     }
+    // If the AI returned a `stops` array, materialise it into the wizard's
+    // SuggestedStop[] shape. Coords are synthesised by spreading across the
+    // viewBox — real geocoding is out of scope for v1; the abstract map is
+    // a visual aid, not a survey. The user can drag pins on Step 05 once
+    // we ship that interaction.
+    const aiStops = (
+      draftPatch as Partial<HuntDraft> & {
+        stops?: { name: string; type: string; blurb: string }[];
+      }
+    ).stops;
+    // Spread the categorical patch (title/recipient/etc.) but explicitly
+    // pluck out `stops` — it's not part of the HuntDraft enum-field set,
+    // and we need to convert it to SuggestedStop[] before assigning.
+    const { stops: _aiStopsKey, ...categoricalPatch } = draftPatch as Partial<
+      HuntDraft
+    > & { stops?: unknown };
+    void _aiStopsKey;
+    const next: HuntDraft = { ...draft, ...categoricalPatch };
+    if (Array.isArray(aiStops) && aiStops.length >= 3) {
+      next.stops = aiStops.map((s, i) => synthStop(s, i, aiStops.length));
+      next.suggestions = []; // AI already curated; show the chosen route only
+    }
+    onDraft(next);
   };
 
   return (
