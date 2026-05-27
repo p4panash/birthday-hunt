@@ -14,6 +14,13 @@ interface HuntSummary {
   created_at: number;
 }
 
+interface PlayerSummary {
+  id: string;
+  name: string;
+  joined_at: number;
+  last_seen_at: number;
+}
+
 interface TeamSummary {
   id: string;
   hunt_id: string;
@@ -21,6 +28,7 @@ interface TeamSummary {
   name: string;
   created_at: number;
   players?: number;
+  roster?: PlayerSummary[];
   step?: string;
   unlocked_count?: number;
   started_at?: number | null;

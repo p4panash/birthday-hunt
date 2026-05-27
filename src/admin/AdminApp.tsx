@@ -488,6 +488,16 @@ const JUMP_TARGETS: Array<{
   },
 ];
 
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return 'just now';
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 function TeamCard({ team }: { team: TeamSummary }) {
   const [copied, setCopied] = useState(false);
   const [jumpOpen, setJumpOpen] = useState(false);
@@ -495,6 +505,7 @@ function TeamCard({ team }: { team: TeamSummary }) {
   const [jumpError, setJumpError] = useState<string | null>(null);
   const stepLabel = team.step ?? 'intro';
   const unlocked = team.unlocked_count ?? 0;
+  const roster = team.roster ?? [];
   return (
     <li
       className="card"
@@ -530,6 +541,37 @@ function TeamCard({ team }: { team: TeamSummary }) {
             <Icon name="qr" size={11} /> {unlocked}/3 unlocked
           </span>
         </div>
+        {roster.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              marginTop: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            {roster.map((p) => (
+              <span
+                key={p.id}
+                className="chip"
+                style={{ fontSize: 11 }}
+                title={`joined ${relativeTime(p.joined_at)} · seen ${relativeTime(p.last_seen_at)}`}
+              >
+                {p.name}
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: 10,
+                    color: 'var(--muted)',
+                    marginLeft: 4,
+                  }}
+                >
+                  · {relativeTime(p.last_seen_at)}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div
         style={{

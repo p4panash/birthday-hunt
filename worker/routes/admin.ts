@@ -99,6 +99,12 @@ admin.get('/hunts/:id', async (c) => {
       return {
         ...teamToResponse(team),
         players: players.length,
+        roster: players.map((p) => ({
+          id: p.id,
+          name: p.name,
+          joined_at: p.joined_at,
+          last_seen_at: p.last_seen_at,
+        })),
         step: state?.step_kind ?? 'intro',
         unlocked_count: unlocked.filter(Boolean).length,
         started_at: state?.started_at ?? null,

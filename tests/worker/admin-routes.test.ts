@@ -136,6 +136,50 @@ describe('GET /api/admin/hunts/:id', () => {
     expect(json.teams[0].name).toBe('team-alpha');
     expect(json.teams[0].invite_code).toMatch(/^[0-9A-HJKMNP-TV-Z]{8}$/);
   });
+
+  it('returns roster of players per team (names + last_seen)', async () => {
+    const create = await (await post('/api/admin/hunts', validCreateHunt))
+      .json<{ hunt: { id: string } }>();
+    const hid = create.hunt.id;
+    const teamRes = await post(`/api/admin/hunts/${hid}/teams`, {
+      name: 'team-alpha',
+    });
+    const { team } = await teamRes.json<{
+      team: { id: string; invite_code: string };
+    }>();
+
+    // Seed two players via the public join endpoint.
+    for (const name of ['andi', 'bogdan']) {
+      const j = await SELF.fetch('http://localhost/api/teams/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invite_code: team.invite_code,
+          player_name: name,
+          client_id: `client-${name}-${'a'.repeat(12)}`,
+        }),
+      });
+      expect(j.status).toBe(200);
+    }
+
+    const res = await get(`/api/admin/hunts/${hid}`);
+    const json = await res.json<{
+      teams: Array<{
+        roster: Array<{
+          name: string;
+          joined_at: number;
+          last_seen_at: number;
+        }>;
+      }>;
+    }>();
+    expect(json.teams[0].roster).toHaveLength(2);
+    const names = json.teams[0].roster.map((p) => p.name).sort();
+    expect(names).toEqual(['andi', 'bogdan']);
+    for (const p of json.teams[0].roster) {
+      expect(p.joined_at).toBeGreaterThan(0);
+      expect(p.last_seen_at).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('PATCH /api/admin/hunts/:id', () => {
