@@ -54,6 +54,89 @@ export const OCCASIONS = [
 
 export type OccasionId = (typeof OCCASIONS)[number]['id'];
 
+// Per-occasion template — drives the Basics step template rail. Each is a
+// curated starting point: vibe, default shape, sample clue, finale, accent
+// colour. Selecting a template sets occasion + suggests shape defaults.
+export interface OccasionVibe {
+  vibe: string;
+  line: string;
+  accent: string;
+  stops: string;
+  duration: string;
+  difficulty: string;
+  finale: string;
+  sample: string;
+  pop?: string;
+}
+
+export const OCCASION_VIBES: Record<OccasionId, OccasionVibe> = {
+  birthday: {
+    vibe: 'warm · in-jokes · low-stakes',
+    line: "We'll lean warm and personal — clues built from shared memory, finale with a wrapped gift.",
+    accent: 'var(--terra)',
+    stops: '5 stops', duration: '~90 min', difficulty: 'Sweet',
+    finale: 'Wrapped gift at a locker',
+    sample: 'Where the first cup was bitter and the first laugh was sweet…',
+    pop: 'most picked',
+  },
+  anniversary: {
+    vibe: 'intimate · slow · serif',
+    line: 'Sentimental tone, slow pacing, fewer stops with more lingering. Reward skews keepsake.',
+    accent: 'var(--terra)',
+    stops: '4 stops', duration: '~2 h', difficulty: 'Gentle',
+    finale: 'Handwritten letter',
+    sample: 'Three years ago you ordered the same thing here, and pretended to like it.',
+  },
+  proposal: {
+    vibe: 'quiet · cinematic · golden hour',
+    line: "Short and unhurried, dusk-leaning. Final stop becomes the setting — we'll suggest the right one.",
+    accent: 'oklch(0.55 0.16 30)',
+    stops: '3 stops', duration: '~75 min', difficulty: 'Gentle',
+    finale: 'Sealed envelope at the lookout',
+    sample: 'Walk slowly. The light is best between the third and fourth lamppost.',
+  },
+  bachelor: {
+    vibe: 'loud · group · slightly mean',
+    line: 'Higher-energy stops (bars, dares, photo proofs). Difficulty creeps up between rounds.',
+    accent: 'oklch(0.50 0.18 320)',
+    stops: '6 stops', duration: '~3 h', difficulty: 'Spicy',
+    finale: 'Rooftop bar, paid tab',
+    sample: "If your team can't sing it, the bartender won't pour it. You know the song.",
+  },
+  team: {
+    vibe: 'group · photo-proofs · timed',
+    line: 'Built for splits — teams of 2–4, photo submissions, leaderboard, finale at a venue with space.',
+    accent: 'oklch(0.50 0.08 150)',
+    stops: '4 stops', duration: '~2 h', difficulty: 'Sweet',
+    finale: 'Pub with reserved tables',
+    sample: 'Find the green door on Strada Iuliu Maniu. Whole team in the photo, please.',
+  },
+  tourist: {
+    vibe: 'curated · landmark-heavy · friendly',
+    line: 'Hits the headline places without feeling like a TripAdvisor list. Clues teach a little history.',
+    accent: 'oklch(0.55 0.10 200)',
+    stops: '6 stops', duration: '~3 h', difficulty: 'Sweet',
+    finale: 'Café with a view',
+    sample: 'Stand where Matei Corvin was born — and look up. The clue is carved, not printed.',
+  },
+  kids: {
+    vibe: 'simple · short · sweet',
+    line: 'Bigger letters, fewer stops, generous hints, daylight only. Reward is a treasure chest of small things.',
+    accent: 'oklch(0.65 0.14 80)',
+    stops: '4 stops', duration: '~45 min', difficulty: 'Gentle',
+    finale: 'Treasure chest of small toys',
+    sample: 'Find the orange door. Knock three times. The shopkeeper has a surprise.',
+  },
+  'just-because': {
+    vibe: 'mellow · pretty walk',
+    line: "No theme baggage. We'll lean on the city itself — pretty corners, good coffee, a soft finale.",
+    accent: 'var(--muted)',
+    stops: '5 stops', duration: '~2 h', difficulty: 'Sweet',
+    finale: 'Coffee at the prettiest café',
+    sample: "There's no reason for this walk. That's the whole point.",
+  },
+};
+
 export const CITIES = [
   { id: 'cluj',      name: 'Cluj-Napoca', meta: 'Transylvania · 290k', tag: '163 places curated' },
   { id: 'buc',       name: 'București',   meta: 'Capital · 1.8M',      tag: '412 places curated' },
