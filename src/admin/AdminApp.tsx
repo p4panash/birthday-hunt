@@ -18,6 +18,7 @@ import {
   type TeamSummary,
 } from './adminApi';
 import Icon from './Icon';
+import CheckpointsMap from './CheckpointsMap';
 import QuestWizard from './wizard/QuestWizard';
 import './trove.css';
 
@@ -359,10 +360,12 @@ function HuntDetail({ huntId }: { huntId: string }) {
     hunt: HuntSummary;
     teams: TeamSummary[];
   } | null>(null);
+  const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState('');
   const [deadlineDraft, setDeadlineDraft] = useState('');
   const [savingDeadline, setSavingDeadline] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const reload = useCallback(() => {
     getHunt(huntId)
@@ -379,16 +382,53 @@ function HuntDetail({ huntId }: { huntId: string }) {
     return () => clearInterval(id);
   }, [reload]);
 
+  // Audit log polls separately at a slower rate. Filtered client-side
+  // to entries that mention this hunt (by hunt id or by any of its team
+  // ids in target).
+  useEffect(() => {
+    function loadAudit() {
+      listAuditLog(200)
+        .then((r) => setAudit(r.entries))
+        .catch(() => {
+          /* non-critical; leave the panel empty */
+        });
+    }
+    loadAudit();
+    const id = setInterval(loadAudit, 5000);
+    return () => clearInterval(id);
+  }, []);
+
   if (error) return <p className="alert">{error}</p>;
   if (!data) return <p style={{ opacity: 0.6 }}>loading…</p>;
+
+  const hunt = data.hunt;
+  const teams = data.teams;
+  const checkpoints = hunt.config.checkpoints;
+  const totalPlayers = teams.reduce((n, t) => n + (t.players ?? 0), 0);
+  const totalUnlocked = teams.reduce((n, t) => n + (t.unlocked_count ?? 0), 0);
+  const maxUnlocked = teams.length * checkpoints.length;
+  const teamIds = new Set(teams.map((t) => t.id));
+  const relevantAudit = (audit ?? [])
+    .filter((e) => {
+      if (e.target === hunt.id) return true;
+      if (teamIds.has(e.target)) return true;
+      if (e.payload_json?.includes(hunt.id)) return true;
+      return false;
+    })
+    .slice(0, 12);
+
+  const shareLink =
+    teams.length === 1
+      ? `${window.location.origin}/join?invite=${encodeURIComponent(teams[0].invite_code)}`
+      : null;
 
   return (
     <PageHeader
       eyebrow="hunt"
-      title={data.hunt.name}
+      title={hunt.name}
       intro={
         <>
-          for <strong>{data.hunt.friend_name}</strong> · teams update live every 2s
+          for <strong>{hunt.friend_name}</strong> · teams update live every 2s
         </>
       }
       actions={
@@ -400,11 +440,64 @@ function HuntDetail({ huntId }: { huntId: string }) {
         </button>
       }
     >
+      {/* ── Stats strip ── */}
       <section
         className="card"
         style={{
-          padding: 20,
-          marginBottom: 20,
+          padding: '14px 18px',
+          marginBottom: 14,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 18,
+        }}
+      >
+        <StatCell
+          label="teams"
+          value={teams.length}
+          sub={`${totalPlayers} player${totalPlayers === 1 ? '' : 's'}`}
+        />
+        <StatCell
+          label="progress"
+          value={`${totalUnlocked}/${maxUnlocked || 0}`}
+          sub="checkpoint unlocks across teams"
+        />
+        <StatCell
+          label="created"
+          value={relativeTime(hunt.created_at)}
+          sub={new Date(hunt.created_at).toLocaleDateString()}
+        />
+        <StatCell
+          label="hunt id"
+          value={<span className="mono" style={{ fontSize: 13 }}>{hunt.id.slice(0, 12)}</span>}
+          sub={
+            <button
+              className="btn-quiet"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                fontSize: 11,
+                color: 'var(--terra)',
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                navigator.clipboard?.writeText(hunt.id);
+                setShareCopied(true);
+                setTimeout(() => setShareCopied(false), 1500);
+              }}
+            >
+              {shareCopied ? 'copied!' : 'copy id'}
+            </button>
+          }
+        />
+      </section>
+
+      {/* ── Deadline ── */}
+      <section
+        className="card"
+        style={{
+          padding: 16,
+          marginBottom: 14,
           display: 'grid',
           gridTemplateColumns: 'auto 1fr auto',
           alignItems: 'center',
@@ -439,7 +532,51 @@ function HuntDetail({ huntId }: { huntId: string }) {
         </button>
       </section>
 
-      <section>
+      {/* ── Map + checkpoints ── */}
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 14,
+          marginBottom: 14,
+        }}
+      >
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div
+            style={{
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--line)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Icon name="map" size={14} color="var(--muted)" />
+            <span className="label" style={{ marginRight: 'auto' }}>route</span>
+            <span className="chip chip-mono" style={{ fontSize: 10 }}>
+              {checkpoints.length} stops
+            </span>
+          </div>
+          <CheckpointsMap checkpoints={checkpoints} height={280} />
+        </div>
+
+        <div className="card" style={{ padding: 16 }}>
+          <div
+            className="label"
+            style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Icon name="pin" size={11} /> checkpoints
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {checkpoints.map((c) => (
+              <CheckpointCard key={c.id} c={c} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Teams ── */}
+      <section style={{ marginBottom: 14 }}>
         <div
           style={{
             display: 'flex',
@@ -454,19 +591,32 @@ function HuntDetail({ huntId }: { huntId: string }) {
           >
             teams
           </h3>
-          <span
-            className="chip chip-moss chip-mono"
-            style={{ fontSize: 10 }}
-          >
-            <Icon name="users" size={10} /> {data.teams.length}
-          </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {shareLink && (
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: 11, padding: '4px 10px' }}
+                onClick={() => {
+                  navigator.clipboard?.writeText(shareLink);
+                }}
+              >
+                <Icon name="link" size={11} /> copy join link
+              </button>
+            )}
+            <span
+              className="chip chip-moss chip-mono"
+              style={{ fontSize: 10 }}
+            >
+              <Icon name="users" size={10} /> {teams.length}
+            </span>
+          </div>
         </div>
 
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {data.teams.map((t) => (
+          {teams.map((t) => (
             <TeamCard key={t.id} team={t} />
           ))}
-          {data.teams.length === 0 && (
+          {teams.length === 0 && (
             <li
               className="card"
               style={{ padding: 16, opacity: 0.6, textAlign: 'center' }}
@@ -506,9 +656,196 @@ function HuntDetail({ huntId }: { huntId: string }) {
           </button>
         </div>
       </section>
+
+      {/* ── Recent activity (audit log scoped to this hunt) ── */}
+      <section>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            marginBottom: 10,
+          }}
+        >
+          <h3
+            className="serif"
+            style={{ fontSize: 20, margin: 0, lineHeight: 1.1 }}
+          >
+            recent activity
+          </h3>
+          <button
+            className="btn btn-quiet"
+            style={{ fontSize: 11, padding: '4px 8px' }}
+            onClick={() => navigate({ kind: 'history' })}
+          >
+            full log <Icon name="arrow-r" size={11} />
+          </button>
+        </div>
+        {!audit && <p style={{ opacity: 0.5, fontSize: 12 }}>loading…</p>}
+        {audit && relevantAudit.length === 0 && (
+          <p style={{ opacity: 0.5, fontSize: 12 }}>
+            no admin actions on this hunt yet.
+          </p>
+        )}
+        {relevantAudit.length > 0 && (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {relevantAudit.map((e) => (
+              <li
+                key={e.id}
+                className="card"
+                style={{
+                  padding: '8px 12px',
+                  marginBottom: 4,
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr auto auto',
+                  alignItems: 'center',
+                  gap: 10,
+                  fontSize: 12,
+                }}
+              >
+                <span className="chip chip-mono" style={{ fontSize: 10 }}>
+                  {e.action}
+                </span>
+                <span style={{ color: 'var(--muted)' }}>
+                  by{' '}
+                  <span style={{ color: 'var(--ink)' }}>
+                    {e.admin_email}
+                  </span>
+                  {e.target && (
+                    <>
+                      {' · '}
+                      <span className="mono" style={{ fontSize: 11 }}>
+                        {e.target.slice(0, 16)}
+                      </span>
+                    </>
+                  )}
+                </span>
+                <span
+                  className="mono"
+                  style={{ fontSize: 10, color: 'var(--muted)' }}
+                >
+                  {new Date(e.created_at).toLocaleString()}
+                </span>
+                <span
+                  className="mono"
+                  style={{ fontSize: 10, color: 'var(--muted-2)' }}
+                >
+                  {relativeTime(e.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </PageHeader>
   );
 }
+
+function StatCell({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="label" style={{ fontSize: 10, marginBottom: 4 }}>
+        {label}
+      </div>
+      <div
+        className="serif"
+        style={{ fontSize: 22, lineHeight: 1, color: 'var(--ink)' }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          style={{
+            fontSize: 11,
+            color: 'var(--muted)',
+            marginTop: 4,
+            lineHeight: 1.3,
+          }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CheckpointCard({ c }: { c: import('shared/config/types').Checkpoint }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '28px 1fr auto',
+        gap: 10,
+        alignItems: 'center',
+        padding: '8px 4px',
+        borderBottom: '1px dashed var(--line)',
+      }}
+    >
+      <div
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: '50%',
+          background: 'var(--terra)',
+          color: 'white',
+          fontFamily: 'var(--mono)',
+          fontSize: 11,
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {c.id}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            color: 'var(--ink)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {c.name}
+        </div>
+        <div
+          style={{
+            fontSize: 11,
+            color: 'var(--muted)',
+            marginTop: 2,
+            display: 'flex',
+            gap: 8,
+          }}
+        >
+          <span className="mono">
+            {c.lat.toFixed(4)}, {c.lng.toFixed(4)}
+          </span>
+          <span style={{ color: 'var(--muted-2)' }}>·</span>
+          <span>radius {c.radiusMeters}m</span>
+        </div>
+      </div>
+      <span
+        className="chip chip-mono"
+        style={{ fontSize: 11, background: 'var(--bg-2)' }}
+        title="code players type at the stop"
+      >
+        {c.code}
+      </span>
+    </div>
+  );
+}
+
 
 const JUMP_TARGETS: Array<{
   label: string;
