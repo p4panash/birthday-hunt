@@ -1,0 +1,8 @@
+# Copy to .dev.vars (gitignored) for local Worker dev.
+#
+# ACCESS_DEV_BYPASS=true skips Cf-Access-Jwt-Assertion verification entirely.
+# Never set this in production — `wrangler deploy` ignores .dev.vars.
+
+ACCESS_DEV_BYPASS=true
+ACCESS_AUD=
+ACCESS_TEAM_DOMAIN=

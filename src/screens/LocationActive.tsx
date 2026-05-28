@@ -10,9 +10,11 @@ type Props = {
   dispatch: React.Dispatch<HuntAction>;
   n: CheckpointIndex;
   testMode: boolean;
+  /** Optional team mini-map; only mounted in team mode. */
+  mapSlot?: React.ReactNode;
 };
 
-export default function LocationActive({ dispatch, n, testMode }: Props) {
+export default function LocationActive({ dispatch, n, testMode, mapSlot }: Props) {
   const cp = config.checkpoints[n];
   const { status, distanceMeters, accuracyMeters } = useGeoWatch({
     lat: cp.lat,
@@ -37,6 +39,8 @@ export default function LocationActive({ dispatch, n, testMode }: Props) {
       <h1 className="location__teaser">{tpl(cp.teaser)}</h1>
 
       <WarmthPulse status={status} tier={tier} />
+
+      {mapSlot}
 
       <button className="btn-ghost" onClick={() => setStuckOpen(true)}>
         {config.stuckSheet.title}

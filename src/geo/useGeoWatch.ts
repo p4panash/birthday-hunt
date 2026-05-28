@@ -14,6 +14,9 @@ export type GeoReading = {
   distanceMeters: number | null;
   accuracyMeters: number | null;
   error: string | null;
+  // Raw position — shared with teammates over WS (presence_position).
+  lat: number | null;
+  lng: number | null;
 };
 
 const IDLE_READING: GeoReading = {
@@ -21,6 +24,8 @@ const IDLE_READING: GeoReading = {
   distanceMeters: null,
   accuracyMeters: null,
   error: null,
+  lat: null,
+  lng: null,
 };
 
 /**
@@ -45,6 +50,8 @@ export function useGeoWatch(
       distanceMeters: d,
       accuracyMeters: mockGeo.accuracy,
       error: null,
+      lat: mockGeo.lat,
+      lng: mockGeo.lng,
     });
   }, [target?.lat, target?.lng, mockGeo]);
 
@@ -75,6 +82,8 @@ export function useGeoWatch(
           distanceMeters: d,
           accuracyMeters: pos.coords.accuracy,
           error: null,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
         });
       },
       (err) => {

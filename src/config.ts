@@ -1,5 +1,5 @@
 /**
- * The ONE file the user edits before launch.
+ * The ONE file the user edits before launch (solo mode).
  *
  * Everything that varies between hunts (recipient name, locations, codes, copy,
  * deadlines) lives here. Replace placeholder values before launch; the rest of
@@ -7,122 +7,18 @@
  *
  * Copy supports [VAR] template substitution — see `src/lib/tpl.ts`. The only
  * substituted var is FRIEND_NAME.
+ *
+ * The type and Zod schema live in shared/config so the worker can validate
+ * hunts.config_json against the same shape. The literal below is parsed at
+ * module load so any divergence from the schema fails fast in dev.
  */
 
-export type Checkpoint = {
-  id: 1 | 2 | 3;
-  name: string;
-  /** Cryptic, always-visible teaser shown on the location screen. */
-  teaser: string;
-  /** Additional landmark clue revealed inside the stuck sheet — more explicit than the teaser, but a nudge, not the answer. */
-  realHint: string;
-  lat: number;
-  lng: number;
-  radiusMeters: number;
-  /** Manual-entry fallback, case-insensitive, whitespace-trimmed. */
-  code: string;
-  /** Banner shown immediately after the reveal animation. */
-  successCopy: string;
-};
+import { HuntConfigSchema } from 'shared/config/schema';
+import type { HuntConfig } from 'shared/config/types';
 
-export type PhotoConfig = {
-  src: string;
-  caption: string;
-  /** Insert this card *after* reveal of step N (0/1/2). */
-  afterStep: 0 | 1 | 2;
-  durationMs?: number;
-};
+export type { Checkpoint, PhotoConfig, HuntConfig } from 'shared/config/types';
 
-export type HuntConfig = {
-  friendName: string;
-
-  intro: {
-    eyebrow: string;
-    headline: string;
-    body: string;
-    cta: string;
-    finePrint: string;
-  };
-
-  gpsPreface: {
-    headline: string;
-    body: string;
-    allowCta: string;
-  };
-
-  /** ISO 8601 timestamp — when the EasyBox returns the package. Drives the countdown. */
-  deadlineISO: string;
-  countdown: {
-    eyebrow: string;
-  };
-
-  checkpoints: [Checkpoint, Checkpoint, Checkpoint];
-
-  /** Status copy mapped to four distance buckets (see WarmthPulse in Phase 3). */
-  warmthStatuses: {
-    veryFar: string; // >500m
-    far: string; // 200–500m
-    close: string; // 50–200m
-    onTop: string; // <50m
-  };
-
-  stuckSheet: {
-    title: string;
-    realHintIntro: string;
-    codeLabel: string;
-    codePlaceholder: string;
-    unlockCta: string;
-    closeCta: string;
-  };
-
-  reveal: {
-    /** Shown above the slice animation, e.g. "GOTCHA." */
-    headline: string;
-    /** Continue CTA when n < 2. */
-    nextCta: string;
-    /** Continue CTA when n === 2. */
-    finaleCta: string;
-  };
-
-  finale: {
-    headline: string;
-    /** Bridge line between the headline and the locker hint. */
-    subheadline: string;
-    /** Label above the locker hint card. */
-    lockerHintLabel: string;
-    /** Caption under the QR. */
-    instruction: string;
-    qrBrightnessTip: string;
-    openLockerMapLabel: string;
-  };
-
-  /**
-   * Where the EasyBox actually is. NOT a checkpoint — the friend goes here
-   * after the hunt completes, scans the assembled QR there.
-   */
-  easyboxLocation: {
-    /** Short name shown prominently on the finale, e.g. "Easybox @ Mega Image …" */
-    name: string;
-    /** Short hint / address description. */
-    hint: string;
-    mapsUrl: string;
-  };
-
-  errors: {
-    wrongCode: string;
-    gpsDenied: string;
-    gpsFlaky: string;
-  };
-
-  photos: PhotoConfig[];
-  sound: {
-    /** If a file fails to load, `.play()` rejects silently — see Phase 7. */
-    unlockSrc: string;
-    finaleSrc: string;
-  };
-};
-
-export const config: HuntConfig = {
+const rawConfig = {
   friendName: "Mihali",
 
   intro: {
@@ -242,7 +138,14 @@ export const config: HuntConfig = {
   },
 };
 
+/**
+ * Validates the literal above at module load. Throws a Zod error with field
+ * paths if the shape drifts from shared/config/schema.ts. The parsed result is
+ * the canonical config for solo mode.
+ */
+export const config: HuntConfig = HuntConfigSchema.parse(rawConfig);
+
 /** Lookup helper — `photoAfter(0)` returns the photo card to show after reveal 0, or null. */
-export function photoAfter(n: 0 | 1 | 2): PhotoConfig | null {
+export function photoAfter(n: 0 | 1 | 2) {
   return config.photos.find((p) => p.afterStep === n) ?? null;
 }
