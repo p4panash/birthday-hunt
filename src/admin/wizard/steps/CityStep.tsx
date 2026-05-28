@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icon';
-import { CITIES, STEPS, type CityId, type CityCoords, type HuntDraft } from '../data';
+import {
+  CITIES,
+  STEPS,
+  type CityId,
+  type CityCoords,
+  type HuntDraft,
+  type SuggestedStop,
+} from '../data';
 import { MapCanvas } from '../MapCanvas';
 import { AiNudge, Field, StepPage } from '../primitives';
 import { geocode, type GeocodeResult } from '../geocode';
+import { fetchNearbyPois, type Poi } from '../overpass';
 import { regenerateStops } from '../regenerateStops';
 
 interface Props {
@@ -11,6 +19,8 @@ interface Props {
   set: <K extends keyof HuntDraft>(k: K, v: HuntDraft[K]) => void;
   /** Called when AI returns fresh stops — replaces draft.stops + clears suggestions. */
   onRegenStops?: (stops: HuntDraft['stops']) => void;
+  /** Click-to-add from the city-aware Popular grid. */
+  addStop?: (s: SuggestedStop) => void;
 }
 
 // Match the picked city (or geocoded result) to one of our 4 supported
@@ -31,7 +41,7 @@ function inferCityId(displayName: string, lat: number, lng: number): CityId | nu
   return null;
 }
 
-export default function CityStep({ draft, set, onRegenStops }: Props) {
+export default function CityStep({ draft, set, onRegenStops, addStop }: Props) {
   const areas = ['Centru istoric', 'Piața Unirii', 'Mănăștur', 'Gheorgheni', 'Mărăști', 'Iris'];
   const [regenBusy, setRegenBusy] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
@@ -58,65 +68,84 @@ export default function CityStep({ draft, set, onRegenStops }: Props) {
     >
       <PlaceSearch draft={draft} set={set} />
 
-      <div className="label" style={{ marginBottom: 10, marginTop: 22 }}>Popular</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        {CITIES.map((c) => {
-          const on = draft.city === c.id && !draft.cityCoords;
-          return (
-            <div
-              key={c.id}
-              className="card"
-              style={{
-                padding: 16,
-                cursor: 'pointer',
-                borderColor: on ? 'var(--terra)' : 'var(--line)',
-                background: on ? 'var(--terra-soft)' : 'var(--paper)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-              }}
-              onClick={() => {
-                set('city', c.id as CityId);
-                set('cityCoords', undefined as unknown as CityCoords);
-              }}
-            >
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 8,
-                  background: 'var(--bg-2)',
-                  border: '1px solid var(--line)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                <MapCanvas tone="light" showLabels={false} density={0.3} />
+      {draft.cityCoords ? (
+        <PopularNearby
+          centre={draft.cityCoords}
+          stopIds={draft.stops.map((s) => s.id)}
+          onAdd={addStop}
+        />
+      ) : (
+        <>
+          <div className="label" style={{ marginBottom: 10, marginTop: 22 }}>
+            Popular
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 12,
+            }}
+          >
+            {CITIES.map((c) => {
+              const on = draft.city === c.id;
+              return (
                 <div
+                  key={c.id}
+                  className="card"
                   style={{
-                    position: 'absolute',
-                    inset: 0,
+                    padding: 16,
+                    cursor: 'pointer',
+                    borderColor: on ? 'var(--terra)' : 'var(--line)',
+                    background: on ? 'var(--terra-soft)' : 'var(--paper)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: 14,
+                  }}
+                  onClick={() => {
+                    set('city', c.id as CityId);
                   }}
                 >
-                  <Icon name="pin" size={18} color="var(--terra)" />
+                  <div
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 8,
+                      background: 'var(--bg-2)',
+                      border: '1px solid var(--line)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <MapCanvas tone="light" showLabels={false} density={0.3} />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Icon name="pin" size={18} color="var(--terra)" />
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="serif" style={{ fontSize: 22, lineHeight: 1 }}>
+                      {c.name}
+                    </div>
+                    <div
+                      style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}
+                    >
+                      {c.meta}
+                    </div>
+                  </div>
+                  <span className="chip chip-mono">{c.tag}</span>
                 </div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="serif" style={{ fontSize: 22, lineHeight: 1 }}>
-                  {c.name}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                  {c.meta}
-                </div>
-              </div>
-              <span className="chip chip-mono">{c.tag}</span>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <div style={{ marginTop: 28 }}>
         <Field label="Area within the city" hint="Quick chips for common districts — or search above for anywhere.">
@@ -549,6 +578,237 @@ function PlaceSearch({ draft, set }: PlaceSearchProps) {
           >
             clear
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Popular Nearby — OSM POIs around the picked centre
+// ─────────────────────────────────────────────────────────────────────
+
+interface PopularNearbyProps {
+  centre: CityCoords;
+  stopIds: string[];
+  onAdd?: (s: SuggestedStop) => void;
+}
+
+function PopularNearby({ centre, stopIds, onAdd }: PopularNearbyProps) {
+  const [pois, setPois] = useState<Poi[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const taken = useMemo(() => new Set(stopIds), [stopIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    setPois(null);
+    setError(null);
+    fetchNearbyPois(centre.lat, centre.lng, {
+      radius: 1800,
+      limit: 8,
+      signal: controller.signal,
+    })
+      .then((p) => {
+        if (cancelled) return;
+        setPois(p);
+      })
+      .catch((e) => {
+        if (cancelled || (e as Error).name === 'AbortError') return;
+        setError((e as Error).message);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [centre.lat, centre.lng]);
+
+  const headerLabel = `Popular in ${centre.shortLabel}`;
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        }}
+      >
+        <div className="label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {headerLabel}
+          {pois && (
+            <span
+              className="mono"
+              style={{
+                fontSize: 9.5,
+                letterSpacing: '0.08em',
+                color: 'var(--muted-2)',
+                background: 'var(--bg-2)',
+                padding: '2px 7px',
+                borderRadius: 999,
+              }}
+            >
+              from osm
+            </span>
+          )}
+        </div>
+        {pois && pois.length > 0 && (
+          <span
+            className="mono"
+            style={{
+              fontSize: 10.5,
+              color: 'var(--muted)',
+              letterSpacing: '0.08em',
+            }}
+          >
+            tap to add to your stops
+          </span>
+        )}
+      </div>
+
+      {pois == null && !error && (
+        <div
+          style={{
+            padding: '24px 14px',
+            border: '1px dashed var(--line-2)',
+            borderRadius: 'var(--r-md)',
+            background: 'var(--bg-2)',
+            fontSize: 12,
+            color: 'var(--muted)',
+            textAlign: 'center',
+          }}
+        >
+          fetching landmarks near {centre.shortLabel}…
+        </div>
+      )}
+
+      {error && (
+        <div
+          style={{
+            padding: '12px 14px',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--r-md)',
+            fontSize: 12,
+            color: 'var(--terra)',
+          }}
+        >
+          Couldn't reach OSM. {error}
+        </div>
+      )}
+
+      {pois && pois.length === 0 && (
+        <div
+          style={{
+            padding: '14px',
+            border: '1px dashed var(--line-2)',
+            borderRadius: 'var(--r-md)',
+            fontSize: 12,
+            color: 'var(--muted)',
+            textAlign: 'center',
+          }}
+        >
+          No tagged POIs near {centre.shortLabel}. Use the AI Regenerate
+          button below to draft stops anyway.
+        </div>
+      )}
+
+      {pois && pois.length > 0 && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 10,
+          }}
+        >
+          {pois.map((p) => {
+            const id = 'osm-' + p.id;
+            const inUse = taken.has(id);
+            return (
+              <button
+                key={p.id}
+                disabled={!onAdd || inUse}
+                onClick={() => {
+                  if (!onAdd) return;
+                  onAdd({
+                    id,
+                    lat: p.lat,
+                    lng: p.lng,
+                    name: p.name,
+                    type: p.kind.label,
+                    time: '15m',
+                    chosen: true,
+                    blurb: `${p.kind.label} near ${centre.shortLabel} (tagged ${p.rawTag} on OSM).`,
+                    tag: p.kind.label,
+                  });
+                }}
+                className="card"
+                style={{
+                  padding: 14,
+                  cursor: onAdd && !inUse ? 'pointer' : 'default',
+                  background: inUse ? 'var(--bg-2)' : 'var(--paper)',
+                  border: '1px solid var(--line)',
+                  opacity: inUse ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  textAlign: 'left',
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    background: inUse ? 'var(--bg-2)' : 'var(--terra-soft)',
+                    border: '1px solid var(--line-2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--terra)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon name={p.kind.icon} size={16} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    className="serif"
+                    style={{
+                      fontSize: 16,
+                      lineHeight: 1.15,
+                      color: 'var(--ink)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {p.name}
+                  </div>
+                  <div
+                    className="mono"
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--muted)',
+                      letterSpacing: '0.05em',
+                      marginTop: 2,
+                    }}
+                  >
+                    {p.kind.label}
+                  </div>
+                </div>
+                <span
+                  className="chip chip-mono"
+                  style={{
+                    fontSize: 9.5,
+                    padding: '2px 7px',
+                    background: 'var(--bg-2)',
+                  }}
+                >
+                  {inUse ? 'added' : '+ add'}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

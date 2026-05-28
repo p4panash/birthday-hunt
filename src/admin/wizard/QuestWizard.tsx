@@ -268,7 +268,14 @@ function StepBody({
     case 'basics':
       return <BasicsStep draft={draft} set={set} />;
     case 'city':
-      return <CityStep draft={draft} set={set} onRegenStops={onRegenStops} />;
+      return (
+        <CityStep
+          draft={draft}
+          set={set}
+          onRegenStops={onRegenStops}
+          addStop={addStop}
+        />
+      );
     case 'theme':
       return <ThemeStep draft={draft} set={set} />;
     case 'shape':
