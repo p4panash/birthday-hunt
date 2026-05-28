@@ -66,6 +66,9 @@ export default function QuestWizard({ onCreated }: Props) {
       };
     });
 
+  const onRegenStops = (stops: SuggestedStop[]) =>
+    setDraft((d) => ({ ...d, stops, suggestions: [] }));
+
   async function publish() {
     setSubmitting(true);
     setError(null);
@@ -127,6 +130,7 @@ export default function QuestWizard({ onCreated }: Props) {
             setDraft={setDraft}
             addStop={addStop}
             removeStop={removeStop}
+            onRegenStops={onRegenStops}
           />
           <Footer
             stepIdx={stepIdx}
@@ -247,6 +251,7 @@ interface StepBodyProps {
   setDraft: React.Dispatch<React.SetStateAction<HuntDraft>>;
   addStop: (s: SuggestedStop) => void;
   removeStop: (id: string) => void;
+  onRegenStops: (stops: SuggestedStop[]) => void;
 }
 
 function StepBody({
@@ -256,20 +261,26 @@ function StepBody({
   setDraft,
   addStop,
   removeStop,
+  onRegenStops,
 }: StepBodyProps) {
   const step = STEPS[stepIdx];
   switch (step.id) {
     case 'basics':
       return <BasicsStep draft={draft} set={set} />;
     case 'city':
-      return <CityStep draft={draft} set={set} />;
+      return <CityStep draft={draft} set={set} onRegenStops={onRegenStops} />;
     case 'theme':
       return <ThemeStep draft={draft} set={set} />;
     case 'shape':
       return <ShapeStep draft={draft} set={set} />;
     case 'map':
       return (
-        <MapStep draft={draft} addStop={addStop} removeStop={removeStop} />
+        <MapStep
+          draft={draft}
+          addStop={addStop}
+          removeStop={removeStop}
+          onRegenStops={onRegenStops}
+        />
       );
     case 'clues':
       return <CluesStep draft={draft} setDraft={setDraft} />;

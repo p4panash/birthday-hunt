@@ -4,10 +4,13 @@ import { CITIES, STEPS, type CityId, type CityCoords, type HuntDraft } from '../
 import { MapCanvas } from '../MapCanvas';
 import { AiNudge, Field, StepPage } from '../primitives';
 import { geocode, type GeocodeResult } from '../geocode';
+import { regenerateStops } from '../regenerateStops';
 
 interface Props {
   draft: HuntDraft;
   set: <K extends keyof HuntDraft>(k: K, v: HuntDraft[K]) => void;
+  /** Called when AI returns fresh stops — replaces draft.stops + clears suggestions. */
+  onRegenStops?: (stops: HuntDraft['stops']) => void;
 }
 
 // Match the picked city (or geocoded result) to one of our 4 supported
@@ -28,8 +31,26 @@ function inferCityId(displayName: string, lat: number, lng: number): CityId | nu
   return null;
 }
 
-export default function CityStep({ draft, set }: Props) {
+export default function CityStep({ draft, set, onRegenStops }: Props) {
   const areas = ['Centru istoric', 'Piața Unirii', 'Mănăștur', 'Gheorgheni', 'Mărăști', 'Iris'];
+  const [regenBusy, setRegenBusy] = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
+  const canRegen = Boolean(draft.cityCoords) || Boolean(draft.city);
+
+  async function doRegenerate() {
+    if (!onRegenStops || !canRegen) return;
+    setRegenBusy(true);
+    setRegenError(null);
+    try {
+      const stops = await regenerateStops(draft);
+      onRegenStops(stops);
+    } catch (e) {
+      setRegenError((e as Error).message);
+    } finally {
+      setRegenBusy(false);
+    }
+  }
+
   return (
     <StepPage
       step={STEPS[1]}
@@ -124,6 +145,77 @@ export default function CityStep({ draft, set }: Props) {
           </div>
         </Field>
       </div>
+
+      {onRegenStops && (
+        <div
+          style={{
+            marginTop: 24,
+            padding: '14px 16px',
+            border: '1px dashed var(--line-2)',
+            borderRadius: 'var(--r-md)',
+            background: 'var(--bg-2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              className="mono"
+              style={{
+                fontSize: 10.5,
+                letterSpacing: '0.12em',
+                color: 'var(--muted)',
+                textTransform: 'uppercase',
+              }}
+            >
+              Changed your mind?
+            </div>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: 'var(--ink-2)',
+                marginTop: 4,
+                fontFamily: 'var(--serif)',
+                fontStyle: 'italic',
+              }}
+            >
+              Regenerate stops around{' '}
+              <span style={{ fontStyle: 'normal', color: 'var(--ink)' }}>
+                {draft.cityCoords?.shortLabel ??
+                  CITIES.find((c) => c.id === draft.city)?.name ??
+                  '—'}
+              </span>
+              {regenError && (
+                <span
+                  className="mono"
+                  style={{
+                    color: 'var(--terra)',
+                    marginLeft: 8,
+                    fontStyle: 'normal',
+                  }}
+                >
+                  · {regenError}
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            className="btn btn-ghost"
+            disabled={regenBusy || !canRegen}
+            onClick={doRegenerate}
+            style={{ fontSize: 12, padding: '8px 14px', whiteSpace: 'nowrap' }}
+          >
+            {regenBusy ? (
+              'Regenerating…'
+            ) : (
+              <>
+                <Icon name="spark" size={13} /> Regenerate stops
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       <AiNudge>
         Bounded radius 800m. 4–6 stops fit a tight walkable loop without burning out the

@@ -2,17 +2,35 @@ import { useCallback, useState } from 'react';
 import Icon from '../../Icon';
 import type { HuntDraft, SuggestedStop } from '../data';
 import WizardMap from '../WizardMap';
+import { regenerateStops } from '../regenerateStops';
 
 interface Props {
   draft: HuntDraft;
   addStop: (s: SuggestedStop) => void;
   removeStop: (id: string) => void;
+  /** Called when AI regenerates stops — replaces draft.stops. */
+  onRegenStops?: (stops: HuntDraft['stops']) => void;
 }
 
-export default function MapStep({ draft, addStop, removeStop }: Props) {
+export default function MapStep({ draft, addStop, removeStop, onRegenStops }: Props) {
   const [selectedId, setSelected] = useState<string | null>(draft.stops[0]?.id ?? null);
   const [hoveredId, setHovered] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [regenBusy, setRegenBusy] = useState(false);
+
+  async function doRegenerate() {
+    if (!onRegenStops) return;
+    setRegenBusy(true);
+    try {
+      const stops = await regenerateStops(draft);
+      onRegenStops(stops);
+      setSelected(stops[0]?.id ?? null);
+    } catch {
+      /* surfaced via UI toast in a follow-up; silent for now */
+    } finally {
+      setRegenBusy(false);
+    }
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -142,6 +160,22 @@ export default function MapStep({ draft, addStop, removeStop }: Props) {
             Walkable in <b>~28 min</b>
           </span>
           <span style={{ flex: 1 }} />
+          {onRegenStops && (
+            <button
+              className="btn-quiet btn"
+              style={{ fontSize: 12, padding: '6px 8px' }}
+              disabled={regenBusy}
+              onClick={doRegenerate}
+              title={
+                draft.cityCoords
+                  ? `Ask AI for fresh stops around ${draft.cityCoords.shortLabel}`
+                  : 'Ask AI for fresh stops'
+              }
+            >
+              <Icon name="spark" size={12} />{' '}
+              {regenBusy ? 'Regenerating…' : 'Regenerate'}
+            </button>
+          )}
           <button
             className="btn-quiet btn"
             style={{ fontSize: 12, padding: '6px 8px' }}

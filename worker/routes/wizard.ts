@@ -416,4 +416,157 @@ wizard.post('/draft', async (c) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────
+// /api/admin/wizard/stops — regenerate stops around a picked location
+// ─────────────────────────────────────────────────────────────────────
+//
+// Called from the CityStep / MapStep "Regenerate stops" affordance. Takes
+// the current draft's categorical fields + a centre lat/lng (from the
+// Nominatim picker or one of the enum cities) and asks Claude for a fresh
+// stops array clustered around that centre. Returns the same shape as the
+// kickoff route's `patch.stops`.
+
+const StopsRequest = z.object({
+  centre: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    displayName: z.string().min(1).max(200),
+  }),
+  occasion: z
+    .enum([
+      'birthday',
+      'anniversary',
+      'proposal',
+      'bachelor',
+      'team',
+      'tourist',
+      'kids',
+      'just-because',
+    ])
+    .optional(),
+  theme: z.string().min(1).max(40).optional(),
+  recipient: z.string().min(1).max(80).optional(),
+  stopCount: z.number().int().min(3).max(12).default(5),
+  /** Optional radius hint in metres around the centre. */
+  radiusMeters: z.number().int().min(100).max(5000).optional(),
+});
+
+const StopsResponse = z.object({
+  stops: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(80),
+        type: z.string().min(1).max(40),
+        blurb: z.string().min(1).max(240),
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+      }),
+    )
+    .min(3)
+    .max(12),
+});
+
+const STOPS_TOOL: Anthropic.Tool = {
+  name: 'suggest_stops',
+  description:
+    'Return a fresh stops list for a hunt, clustered around the given centre. ' +
+    'Each stop is a real venue near that centre with theme-appropriate vibe.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      stops: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 12,
+        items: {
+          type: 'object',
+          required: ['name', 'type', 'blurb', 'lat', 'lng'],
+          properties: {
+            name: { type: 'string' },
+            type: { type: 'string' },
+            blurb: { type: 'string' },
+            lat: { type: 'number' },
+            lng: { type: 'number' },
+          },
+        },
+      },
+    },
+    required: ['stops'],
+  },
+};
+
+wizard.post('/stops', async (c) => {
+  const key = c.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    return c.json(
+      { error: { code: 'ai_unconfigured', message: 'ANTHROPIC_API_KEY not set' } },
+      503,
+    );
+  }
+  let body: z.infer<typeof StopsRequest>;
+  try {
+    body = StopsRequest.parse(await c.req.json());
+  } catch (e) {
+    return c.json(
+      { error: { code: 'invalid_input', message: (e as Error).message } },
+      400,
+    );
+  }
+
+  const client = new Anthropic({ apiKey: key });
+  const sys =
+    `You are a treasure-hunt designer. Return ${body.stopCount} real, named ` +
+    `venues clustered around lat ${body.centre.lat.toFixed(4)}, lng ` +
+    `${body.centre.lng.toFixed(4)} (${body.centre.displayName}). ` +
+    `Walking distance — within ${body.radiusMeters ?? 800} m of the centre. ` +
+    `Match the theme and occasion below; use real local landmarks where ` +
+    `possible. Provide approximate but realistic lat/lng for each.` +
+    `\n\nContext:` +
+    (body.occasion ? `\n- occasion: ${body.occasion}` : '') +
+    (body.theme ? `\n- theme: ${body.theme}` : '') +
+    (body.recipient ? `\n- for: ${body.recipient}` : '');
+
+  let aiResponse;
+  try {
+    aiResponse = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1500,
+      system: sys,
+      tools: [STOPS_TOOL],
+      tool_choice: { type: 'tool', name: 'suggest_stops' },
+      messages: [
+        {
+          role: 'user',
+          content: `Generate ${body.stopCount} stops near ${body.centre.displayName}.`,
+        },
+      ],
+    });
+  } catch (err) {
+    return c.json(
+      { error: { code: 'ai_upstream', message: (err as Error).message } },
+      502,
+    );
+  }
+  const tu = aiResponse.content.find((b) => b.type === 'tool_use');
+  if (!tu || tu.type !== 'tool_use') {
+    return c.json(
+      { error: { code: 'no_tool_use', message: 'model did not call tool' } },
+      502,
+    );
+  }
+  const parsed = StopsResponse.safeParse(tu.input);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          code: 'ai_malformed',
+          message: parsed.error.issues.map((i) => i.message).join('; '),
+        },
+      },
+      502,
+    );
+  }
+  return c.json(parsed.data);
+});
+
 export { wizard as wizardRoutes };
