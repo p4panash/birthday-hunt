@@ -258,6 +258,22 @@ export const DRAFT_CLUES: Record<string, DraftClue> = {
   cetatuia:    { type: 'Final',    text: 'Climb until the city gets quiet. The bench facing the river is yours tonight. Look under the seat.' },
 };
 
+/**
+ * Custom geocoded place picked by the user in Step 02. When present, the
+ * wizard map centres on these coordinates instead of CITY_CENTERS[draft.city].
+ * Lets users pick neighbourhoods, addresses, or cities not in the enum
+ * (e.g. Baia Mare) without forcing us to expand the enum.
+ */
+export interface CityCoords {
+  lat: number;
+  lng: number;
+  zoom: number;
+  /** Display name from Nominatim, e.g. "Centru istoric, Cluj-Napoca". */
+  displayName: string;
+  /** Short label suitable for chips / postcard. */
+  shortLabel: string;
+}
+
 export interface HuntDraft {
   title: string;
   occasion: OccasionId;
@@ -266,6 +282,12 @@ export interface HuntDraft {
   timeStart: string;
   timeEnd: string;
   city: CityId;
+  /**
+   * Optional free-form geocoded place. Takes precedence over `city` for
+   * map centring. `city` stays around as the fallback + as a coarse hint
+   * for the AI prompt.
+   */
+  cityCoords?: CityCoords;
   area: string;
   theme: string;
   stopCount: number;

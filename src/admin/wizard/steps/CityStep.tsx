@@ -1,11 +1,31 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icon';
-import { CITIES, STEPS, type CityId, type HuntDraft } from '../data';
+import { CITIES, STEPS, type CityId, type CityCoords, type HuntDraft } from '../data';
 import { MapCanvas } from '../MapCanvas';
 import { AiNudge, Field, StepPage } from '../primitives';
+import { geocode, type GeocodeResult } from '../geocode';
 
 interface Props {
   draft: HuntDraft;
   set: <K extends keyof HuntDraft>(k: K, v: HuntDraft[K]) => void;
+}
+
+// Match the picked city (or geocoded result) to one of our 4 supported
+// enum cities. If none of them fit, we keep `draft.city` at its previous
+// value and rely on `draft.cityCoords` for the map.
+function inferCityId(displayName: string, lat: number, lng: number): CityId | null {
+  const lower = displayName.toLowerCase();
+  if (lower.includes('cluj-napoca') || lower.includes('cluj napoca') || lower.includes(' cluj,')) return 'cluj';
+  if (lower.includes('bucurești') || lower.includes('bucuresti') || lower.includes('bucharest')) return 'buc';
+  if (lower.includes('brașov') || lower.includes('brasov')) return 'brasov';
+  if (lower.includes('timișoara') || lower.includes('timisoara')) return 'timisoara';
+  // Coarse rectangular bounds for each city as a fallback if the display
+  // string doesn't name the city explicitly (e.g. a neighbourhood-only hit).
+  if (lat > 46.7 && lat < 46.85 && lng > 23.5 && lng < 23.7) return 'cluj';
+  if (lat > 44.35 && lat < 44.55 && lng > 25.95 && lng < 26.25) return 'buc';
+  if (lat > 45.6 && lat < 45.7 && lng > 25.55 && lng < 25.65) return 'brasov';
+  if (lat > 45.7 && lat < 45.8 && lng > 21.15 && lng < 21.3) return 'timisoara';
+  return null;
 }
 
 export default function CityStep({ draft, set }: Props) {
@@ -13,30 +33,14 @@ export default function CityStep({ draft, set }: Props) {
   return (
     <StepPage
       step={STEPS[1]}
-      intro="Pick a city. We'll narrow stop suggestions to a walkable district inside it on the next step."
+      intro="Pick a city — or search a neighbourhood, address, or landmark. We'll narrow stop suggestions to walking distance from your choice."
     >
-      <div style={{ position: 'relative', marginBottom: 22 }}>
-        <Icon
-          name="search"
-          size={16}
-          color="var(--muted)"
-          style={{
-            position: 'absolute',
-            left: 12,
-            top: '50%',
-            transform: 'translateY(-50%)',
-          }}
-        />
-        <input
-          className="input"
-          placeholder="Search a city, neighbourhood, or address"
-          style={{ paddingLeft: 38, fontSize: 14 }}
-        />
-      </div>
-      <div className="label" style={{ marginBottom: 10 }}>Popular</div>
+      <PlaceSearch draft={draft} set={set} />
+
+      <div className="label" style={{ marginBottom: 10, marginTop: 22 }}>Popular</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         {CITIES.map((c) => {
-          const on = draft.city === c.id;
+          const on = draft.city === c.id && !draft.cityCoords;
           return (
             <div
               key={c.id}
@@ -50,7 +54,10 @@ export default function CityStep({ draft, set }: Props) {
                 alignItems: 'center',
                 gap: 14,
               }}
-              onClick={() => set('city', c.id as CityId)}
+              onClick={() => {
+                set('city', c.id as CityId);
+                set('cityCoords', undefined as unknown as CityCoords);
+              }}
             >
               <div
                 style={{
@@ -91,7 +98,7 @@ export default function CityStep({ draft, set }: Props) {
       </div>
 
       <div style={{ marginTop: 28 }}>
-        <Field label="Area within the city" hint="We'll bias suggestions to this area.">
+        <Field label="Area within the city" hint="Quick chips for common districts — or search above for anywhere.">
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {areas.map((a) => {
               const on = draft.area === a;
@@ -114,9 +121,6 @@ export default function CityStep({ draft, set }: Props) {
                 </button>
               );
             })}
-            <button className="chip">
-              <Icon name="plus" size={11} /> Custom area on map
-            </button>
           </div>
         </Field>
       </div>
@@ -127,4 +131,359 @@ export default function CityStep({ draft, set }: Props) {
       </AiNudge>
     </StepPage>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Place search — debounced Nominatim autocomplete
+// ─────────────────────────────────────────────────────────────────────
+
+interface PlaceSearchProps {
+  draft: HuntDraft;
+  set: <K extends keyof HuntDraft>(k: K, v: HuntDraft[K]) => void;
+}
+
+function PlaceSearch({ draft, set }: PlaceSearchProps) {
+  const [query, setQuery] = useState(draft.cityCoords?.shortLabel ?? '');
+  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [status, setStatus] = useState<'idle' | 'searching' | 'error' | 'no-results'>('idle');
+  const [focused, setFocused] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(0);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Debounce queries to ~250ms. Also abort any in-flight request when
+  // the query changes, so we don't apply stale results.
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setResults([]);
+      setStatus('idle');
+      return;
+    }
+    const controller = new AbortController();
+    const handle = window.setTimeout(async () => {
+      setStatus('searching');
+      try {
+        const hits = await geocode(query, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        setResults(hits);
+        setStatus(hits.length === 0 ? 'no-results' : 'idle');
+        setHighlightIdx(0);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        setStatus('error');
+        setResults([]);
+      }
+    }, 250);
+    return () => {
+      window.clearTimeout(handle);
+      controller.abort();
+    };
+  }, [query]);
+
+  // Close the dropdown on outside click.
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (!wrapRef.current) return;
+      if (!wrapRef.current.contains(e.target as Node)) {
+        setFocused(false);
+      }
+    }
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, []);
+
+  function pick(r: GeocodeResult) {
+    const cityId = inferCityId(r.displayName, r.lat, r.lng);
+    if (cityId) {
+      set('city', cityId);
+    }
+    set('cityCoords', {
+      lat: r.lat,
+      lng: r.lng,
+      zoom: r.zoom,
+      displayName: r.displayName,
+      shortLabel: r.shortLabel,
+    });
+    // For neighbourhood-class hits, also seed the area field so the chip
+    // below the city cards reflects the choice.
+    if (
+      r.kind === 'suburb' ||
+      r.kind === 'neighbourhood' ||
+      r.kind === 'quarter' ||
+      r.kind === 'city_district'
+    ) {
+      set('area', r.shortLabel);
+    }
+    setQuery(r.shortLabel);
+    setFocused(false);
+    inputRef.current?.blur();
+  }
+
+  function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!focused || results.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIdx((i) => Math.min(results.length - 1, i + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIdx((i) => Math.max(0, i - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const r = results[highlightIdx];
+      if (r) pick(r);
+    } else if (e.key === 'Escape') {
+      setFocused(false);
+    }
+  }
+
+  const showDropdown =
+    focused &&
+    (results.length > 0 || status === 'searching' || status === 'no-results' || status === 'error');
+
+  const cleared = useMemo(
+    () => draft.cityCoords && draft.cityCoords.shortLabel !== query,
+    [draft.cityCoords, query],
+  );
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <Icon
+          name="search"
+          size={16}
+          color="var(--muted)"
+          style={{
+            position: 'absolute',
+            left: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+          }}
+        />
+        <input
+          ref={inputRef}
+          className="input"
+          placeholder="Search a city, neighbourhood, landmark, or address"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onKeyDown={onKey}
+          style={{ paddingLeft: 38, paddingRight: query ? 84 : 14, fontSize: 14 }}
+          aria-autocomplete="list"
+          aria-expanded={showDropdown}
+        />
+        {status === 'searching' && (
+          <span
+            className="mono"
+            style={{
+              position: 'absolute',
+              right: 14,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: 10,
+              color: 'var(--muted)',
+              letterSpacing: '0.08em',
+            }}
+          >
+            searching…
+          </span>
+        )}
+        {query && status !== 'searching' && (
+          <button
+            onClick={() => {
+              setQuery('');
+              set('cityCoords', undefined as unknown as CityCoords);
+              inputRef.current?.focus();
+            }}
+            style={{
+              position: 'absolute',
+              right: 8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--muted)',
+              cursor: 'pointer',
+              padding: 4,
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: 4,
+            }}
+            aria-label="clear search"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        )}
+      </div>
+
+      {showDropdown && (
+        <div
+          role="listbox"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            background: 'var(--paper)',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--r-md)',
+            boxShadow: 'var(--shadow-2)',
+            zIndex: 10,
+            maxHeight: 320,
+            overflowY: 'auto',
+          }}
+        >
+          {status === 'searching' && results.length === 0 && (
+            <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--muted)' }}>
+              searching Romania…
+            </div>
+          )}
+          {status === 'no-results' && (
+            <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--muted)' }}>
+              No matches in Romania. Try a different spelling, or pick from the popular cities below.
+            </div>
+          )}
+          {status === 'error' && (
+            <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--terra)' }}>
+              Couldn't reach the geocoder. Try again in a moment.
+            </div>
+          )}
+          {results.map((r, i) => {
+            const active = i === highlightIdx;
+            return (
+              <button
+                key={r.id}
+                role="option"
+                aria-selected={active}
+                onMouseEnter={() => setHighlightIdx(i)}
+                onClick={() => pick(r)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  background: active ? 'var(--bg-2)' : 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid var(--line-2)',
+                  padding: '10px 14px',
+                  cursor: 'pointer',
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr auto',
+                  alignItems: 'center',
+                  gap: 12,
+                  fontFamily: 'var(--sans)',
+                }}
+              >
+                <Icon
+                  name={iconForKind(r.kind)}
+                  size={14}
+                  color={active ? 'var(--terra)' : 'var(--muted)'}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13.5,
+                      color: 'var(--ink)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {r.shortLabel}
+                  </div>
+                  {r.context && (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--muted)',
+                        marginTop: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {r.context}
+                    </div>
+                  )}
+                </div>
+                <span
+                  className="chip chip-mono"
+                  style={{ fontSize: 9, padding: '2px 7px', background: 'var(--bg-2)' }}
+                >
+                  {r.kind}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Picked place chip — surfaces below the input once a result has
+          been chosen, so the user sees what's currently set without
+          reopening the dropdown. */}
+      {draft.cityCoords && !focused && !cleared && (
+        <div
+          style={{
+            marginTop: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 12px',
+            background: 'var(--terra-soft)',
+            border: '1px solid oklch(0.85 0.06 45)',
+            borderRadius: 'var(--r-md)',
+            fontSize: 12,
+            color: 'var(--ink-2)',
+          }}
+        >
+          <Icon name="pin" size={13} color="var(--terra)" />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontWeight: 500, color: 'var(--ink)' }}>
+              {draft.cityCoords.shortLabel}
+            </span>
+            <span className="mono" style={{ marginLeft: 8, color: 'var(--muted)' }}>
+              {draft.cityCoords.lat.toFixed(4)}, {draft.cityCoords.lng.toFixed(4)}
+            </span>
+          </span>
+          <button
+            onClick={() => {
+              setQuery('');
+              set('cityCoords', undefined as unknown as CityCoords);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--muted)',
+              cursor: 'pointer',
+              fontSize: 11,
+            }}
+          >
+            clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+import type { IconName } from '../../Icon';
+
+function iconForKind(kind: string): IconName {
+  switch (kind) {
+    case 'city':
+    case 'town':
+    case 'village':
+      return 'map';
+    case 'suburb':
+    case 'neighbourhood':
+    case 'quarter':
+    case 'city_district':
+      return 'pin';
+    case 'road':
+    case 'street':
+      return 'route';
+    case 'house':
+    case 'amenity':
+    case 'shop':
+      return 'pin';
+    default:
+      return 'search';
+  }
 }

@@ -162,6 +162,7 @@ export default function MapStep({ draft, addStop, removeStop }: Props) {
       >
         <WizardMap
           city={draft.city}
+          cityCoords={draft.cityCoords}
           stops={draft.stops}
           suggestions={draft.suggestions}
           selectedId={selectedId}

@@ -7,11 +7,13 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { SuggestedStop } from './data';
+import type { CityCoords, SuggestedStop } from './data';
 import { CITY_CENTERS, type CityId } from './data';
 
 interface Props {
   city: CityId;
+  /** Custom geocoded centre — takes precedence over CITY_CENTERS[city]. */
+  cityCoords?: CityCoords;
   stops: SuggestedStop[];
   suggestions: SuggestedStop[];
   selectedId: string | null;
@@ -56,6 +58,7 @@ function escapeHtml(s: string): string {
 
 export default function WizardMap({
   city,
+  cityCoords,
   stops,
   suggestions,
   selectedId,
@@ -71,7 +74,7 @@ export default function WizardMap({
   // One-time init.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const centre = CITY_CENTERS[city];
+    const centre = cityCoords ?? CITY_CENTERS[city];
     const map = L.map(containerRef.current, {
       center: [centre.lat, centre.lng],
       zoom: centre.zoom,
@@ -91,10 +94,9 @@ export default function WizardMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recentre when the picked city changes OR when the stops set obviously
-  // points somewhere else (e.g. AI returned Baia Mare stops). We fit the
-  // bounds of the chosen stops if there are any; otherwise fall back to
-  // the city centre.
+  // Recentre when the picked city / geocoded place changes OR when the
+  // stops set obviously points somewhere else. Geocoded cityCoords win
+  // over the CityId enum centre.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -102,10 +104,10 @@ export default function WizardMap({
       const bounds = L.latLngBounds(stops.map((s) => [s.lat, s.lng] as [number, number]));
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     } else {
-      const c = CITY_CENTERS[city];
+      const c = cityCoords ?? CITY_CENTERS[city];
       map.setView([c.lat, c.lng], c.zoom);
     }
-  }, [city, stops]);
+  }, [city, cityCoords, stops]);
 
   // Reconcile markers + route line on every render.
   useEffect(() => {
